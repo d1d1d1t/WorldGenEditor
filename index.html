@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WorldGenEditor</title>
+
+  <link rel="stylesheet" href="assets/css/reset.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/windows.css">
+</head>
+
+<body>
+
+<div id="workspace"></div>
+
+<script type="module">
+import { PROJECT } from "./shared/project.js";
+import { sendToWidget, MSG } from "./shared/widget-api.js";
+
+// ---- prototype window system ----
+const workspace = document.getElementById("workspace");
+
+function createWidget(name, url, x, y) {
+
+  const frame = document.createElement("iframe");
+
+  frame.src = url;
+
+  frame.style.position = "absolute";
+  frame.style.left = `${x}px`;
+  frame.style.top = `${y}px`;
+  frame.style.width = "500px";
+  frame.style.height = "500px";
+  frame.style.border = "1px solid #333";
+
+  frame.dataset.widgetName = name;
+
+  frame.onload = () => {
+
+    sendToWidget(frame, {
+      type: MSG.INIT,
+      payload: {
+        name,
+        project: PROJECT
+      }
+    });
+
+  };
+
+  workspace.appendChild(frame);
+
+  return frame;
+}
+
+// ---- receive messages from widgets ----
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+
+  if (!msg || !msg.type) return;
+
+  switch (msg.type) {
+
+    case "LOG":
+      console.log("[Widget]", msg.payload);
+      break;
+
+    case "EXPORT":
+      console.log("Export request from widget:", msg);
+      break;
+
+    case "SYNC":
+      console.log("Sync data:", msg.payload);
+      break;
+
+    default:
+      console.log("Unknown widget message:", msg);
+  }
+});
+
+// ---- launch widgets ----
+createWidget("terrain", "widgets/terrain.html", 20, 20);
+createWidget("road", "widgets/road.html", 540, 20);
+createWidget("feature", "widgets/feature.html", 20, 540);
+
+console.log("WorldGenEditor prototype running:", PROJECT);
+</script>
+
+</body>
+</html>

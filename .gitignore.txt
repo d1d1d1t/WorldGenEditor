@@ -1,0 +1,35 @@
+# =========================
+# OS / Editor junk
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Temporary exports
+# (generated terrain/roads/features)
+# =========================
+exports/
+output/
+dist/
+build/
+
+# =========================
+# IDE folders (optional)
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Node (only if you ever add tooling later)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

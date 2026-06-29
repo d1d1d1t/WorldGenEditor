@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Terrain Generator</title>
+
+  <link rel="stylesheet" href="../assets/css/reset.css">
+  <link rel="stylesheet" href="../assets/css/theme.css">
+  <link rel="stylesheet" href="../assets/css/widgets.css">
+</head>
+
+<body>
+
+<div class="widget">
+  <div class="widget-toolbar">
+    Terrain Generator
+    <button id="regen">Regenerate</button>
+  </div>
+
+  <div class="widget-canvas">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<script type="module">
+
+import { QUANTIZATION_LEVELS } from "../data/quantization-levels.js";
+import { TILE_SPEC } from "../data/tile-spec.js";
+import { createCanvas, context, clear } from "../shared/bitmap.js";
+import { grayscale } from "../shared/colors.js";
+import { listenToHub } from "../shared/widget-api.js";
+import { PROJECT } from "../shared/project.js";
+
+let seed = PROJECT.seed;
+
+// -----------------------------
+// Canvas setup (1920 × 1920)
+// -----------------------------
+const canvas = document.getElementById("canvas");
+canvas.width = TILE_SPEC.canvas.terrain.width;
+canvas.height = TILE_SPEC.canvas.terrain.height;
+
+const ctx = context(canvas);
+
+// -----------------------------
+// Deterministic RNG (simple)
+// -----------------------------
+function rng(seed) {
+  let t = seed;
+  return function () {
+    t ^= t << 13;
+    t ^= t >> 17;
+    t ^= t << 5;
+    return (t >>> 0) / 4294967296;
+  };
+}
+
+// -----------------------------
+// Terrain generation
+// -----------------------------
+function generateTerrain() {
+
+  clear(ctx, "#000");
+
+  const random = rng(seed);
+
+  const gridSize = TILE_SPEC.canvas.terrain.width / TILE_SPEC.micro.terrain.width; 
+  // 1920 / 64 = 30 mTiles per axis
+
+  const cellSize = TILE_SPEC.micro.terrain.width;
+
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+
+      const hIndex = Math.floor(random() * QUANTIZATION_LEVELS.length);
+      const h = QUANTIZATION_LEVELS[hIndex];
+
+      ctx.fillStyle = grayscale(h * 255);
+
+      ctx.fillRect(
+        x * cellSize,
+        y * cellSize,
+        cellSize,
+        cellSize
+      );
+    }
+  }
+}
+
+// -----------------------------
+// UI
+// -----------------------------
+document.getElementById("regen").addEventListener("click", () => {
+  seed = Math.floor(Math.random() * 1e9);
+  generateTerrain();
+});
+
+// -----------------------------
+// Hub communication (optional)
+// -----------------------------
+listenToHub((msg) => {
+
+  if (msg.type === "INIT") {
+    if (msg.payload?.project?.seed) {
+      seed = msg.payload.project.seed;
+    }
+    generateTerrain();
+  }
+
+});
+
+// initial render
+generateTerrain();
+
+</script>
+
+</body>
+</html>

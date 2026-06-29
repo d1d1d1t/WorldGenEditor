@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Road Generator</title>
+
+  <link rel="stylesheet" href="../assets/css/reset.css">
+  <link rel="stylesheet" href="../assets/css/theme.css">
+  <link rel="stylesheet" href="../assets/css/widgets.css">
+</head>
+
+<body>
+
+<div class="widget">
+  <div class="widget-toolbar">
+    Road Generator
+    <button id="regen">Regenerate</button>
+  </div>
+
+  <div class="widget-canvas">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<script type="module">
+
+import { TILE_SPEC } from "../data/tile-spec.js";
+import { context, clear } from "../shared/bitmap.js";
+import { grayscale } from "../shared/colors.js";
+import { listenToHub } from "../shared/widget-api.js";
+import { PROJECT } from "../shared/project.js";
+
+// -----------------------------
+// Canvas setup (192 × 1920)
+// -----------------------------
+const canvas = document.getElementById("canvas");
+
+canvas.width = TILE_SPEC.canvas.road.width;
+canvas.height = TILE_SPEC.canvas.road.height;
+
+const ctx = context(canvas);
+
+// -----------------------------
+// Seeded RNG
+// -----------------------------
+function rng(seed) {
+  let t = seed;
+  return function () {
+    t ^= t << 13;
+    t ^= t >> 17;
+    t ^= t << 5;
+    return (t >>> 0) / 4294967296;
+  };
+}
+
+let seed = PROJECT.seed;
+
+// -----------------------------
+// Road generation (strip logic)
+// -----------------------------
+function generateRoad() {
+
+  clear(ctx, "#000");
+
+  const random = rng(seed);
+
+  const width = TILE_SPEC.canvas.road.width;   // 192px
+  const height = TILE_SPEC.canvas.road.height; // 1920px
+
+  const rTileW = TILE_SPEC.micro.road.width;   // 48
+  const rTileH = TILE_SPEC.micro.road.height;  // 32
+
+  const cols = Math.floor(width / rTileW);   // ~4 columns
+  const rows = Math.floor(height / rTileH);  // ~60 rows
+
+  // simple path bias center column
+  let centerX = Math.floor(cols / 2);
+
+  for (let y = 0; y < rows; y++) {
+
+    // slight wandering path
+    if (random() > 0.7) {
+      centerX += random() > 0.5 ? 1 : -1;
+    }
+
+    centerX = Math.max(0, Math.min(cols - 1, centerX));
+
+    for (let x = 0; x < cols; x++) {
+
+      const dist = Math.abs(x - centerX);
+
+      // road intensity falloff
+      let value;
+
+      if (dist === 0) value = 0.90;
+      else if (dist === 1) value = 0.65;
+      else if (dist === 2) value = 0.40;
+      else value = 0.20;
+
+      ctx.fillStyle = grayscale(value * 255);
+
+      ctx.fillRect(
+        x * rTileW,
+        y * rTileH,
+        rTileW,
+        rTileH
+      );
+    }
+  }
+}
+
+// -----------------------------
+// UI
+// -----------------------------
+document.getElementById("regen").addEventListener("click", () => {
+  seed = Math.floor(Math.random() * 1e9);
+  generateRoad();
+});
+
+// -----------------------------
+// Hub communication
+// -----------------------------
+listenToHub((msg) => {
+
+  if (msg.type === "INIT") {
+
+    if (msg.payload?.project?.seed) {
+      seed = msg.payload.project.seed;
+    }
+
+    generateRoad();
+  }
+
+});
+
+// initial render
+generateRoad();
+
+</script>
+
+</body>
+</html>
