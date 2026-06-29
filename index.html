@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>WorldGenEditor</title>
+<meta charset="UTF-8">
+<title>WorldGenEditor</title>
 
-  <link rel="stylesheet" href="assets/css/reset.css">
-  <link rel="stylesheet" href="assets/css/theme.css">
-  <link rel="stylesheet" href="assets/css/layout.css">
-  <link rel="stylesheet" href="assets/css/windows.css">
+<link rel="stylesheet" href="assets/css/reset.css">
+<link rel="stylesheet" href="assets/css/theme.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<link rel="stylesheet" href="assets/css/windows.css">
 
-  <style>
+<style>
 /* =========================================================
-   GLOBAL RESET
+   GLOBAL
    ========================================================= */
 
 html, body {
@@ -25,7 +25,7 @@ html, body {
 }
 
 /* =========================================================
-   TOOLBAR (SAFE ZONE)
+   TOOLBAR
    ========================================================= */
 
 #menu {
@@ -46,24 +46,25 @@ html, body {
 }
 
 /* =========================================================
-   MAIN LAYOUT CONTAINER RULE
+   WORKSPACE (FLEX SYSTEM)
    ========================================================= */
 
 #workspace {
   position: absolute;
-  top: 60px; /* below toolbar */
+  top: 60px;
   left: 0;
   right: 0;
   bottom: 0;
 
   display: flex;
+  flex-direction: row;
 
   background: #000;
   overflow: hidden;
 }
 
 /* =========================================================
-   ZONES (CORE LAYOUT BLOCKS)
+   ZONES
    ========================================================= */
 
 .zone {
@@ -72,29 +73,21 @@ html, body {
   overflow: hidden;
   border: 1px solid #222;
   background: #111;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 /* =========================================================
-   4 : 2 : 1 RATIO SYSTEM
+   4 : 2 : 1 SYSTEM (STABLE WEIGHTS)
    ========================================================= */
 
-#terrainZone {
-  flex: 4;
-  min-width: 0;
-}
-
-#featureZone {
-  flex: 2;
-  min-width: 0;
-}
-
-#roadZone {
-  flex: 1;
-  min-width: 0;
-}
+#terrainZone { flex: 4; }
+#featureZone { flex: 2; }
+#roadZone { flex: 1; }
 
 /* =========================================================
-   VISUAL SAFETY (prevents iframe overflow bugs)
+   WINDOW FRAME FIXES
    ========================================================= */
 
 .window-title {
@@ -118,31 +111,63 @@ html, body {
   border: none;
   display: block;
 }
-
-/* =========================================================
-   GUARANTEED NEGATIVE SPACE BEHAVIOR
-   ========================================================= */
-
-.zone:not(:last-child) {
-  border-right: 1px solid #111;
-}
 </style>
 </head>
 
 <body>
 
+<!-- TOOLBAR -->
+<div id="menu"></div>
+
+<!-- WORKSPACE -->
 <div id="workspace"></div>
 
 <script type="module">
+
 import { PROJECT } from "./shared/project.js";
 import { sendToWidget, MSG } from "./shared/widget-api.js";
 
 const workspace = document.getElementById("workspace");
+const menuZone = document.getElementById("menu");
 
-/* zones */
-const menuZone    = document.createElement("div");
-menuZone.id = "menu";
-menuZone.className = "zone";
+/* =========================================================
+   WIDGET CREATION SYSTEM
+   ========================================================= */
+
+function createWidget(name, url, zone) {
+
+  // container frame wrapper
+  const wrapper = document.createElement("div");
+  wrapper.style.width = "100%";
+  wrapper.style.height = "100%";
+  wrapper.style.display = "flex";
+  wrapper.style.flexDirection = "column";
+
+  // iframe
+  const frame = document.createElement("iframe");
+  frame.src = url;
+  frame.style.flex = "1";
+  frame.style.border = "none";
+
+  frame.onload = () => {
+    sendToWidget(frame, {
+      type: MSG.INIT,
+      payload: {
+        name,
+        project: PROJECT
+      }
+    });
+  };
+
+  wrapper.appendChild(frame);
+  zone.appendChild(wrapper);
+
+  return wrapper;
+}
+
+/* =========================================================
+   ZONES (SINGLE SOURCE OF TRUTH)
+   ========================================================= */
 
 const terrainZone = document.createElement("div");
 terrainZone.id = "terrainZone";
@@ -156,50 +181,23 @@ const roadZone = document.createElement("div");
 roadZone.id = "roadZone";
 roadZone.className = "zone";
 
-const padL = document.createElement("div");
-padL.className = "zone padL";
-
-const padR = document.createElement("div");
-padR.className = "zone padR";
-
-workspace.appendChild(menuZone);
-workspace.appendChild(padL);
-workspace.appendChild(terrainZone);
-workspace.appendChild(featureZone);
-workspace.appendChild(roadZone);
-workspace.appendChild(padR);
-
-  
-
-
-/* =========================================================
-   GRID LAYOUT MAP
-   ========================================================= */
-
-const menuZone    = createZone(1, 1, 3, 1); // top full width
-const terrainZone = createZone(2, 2, 1, 2); // center column spanning rows
-const featureZone = createZone(3, 2, 1, 1); // upper right
-const roadZone    = createZone(3, 3, 1, 1); // lower right
-
-workspace.appendChild(menuZone);
+/* append zones */
 workspace.appendChild(terrainZone);
 workspace.appendChild(featureZone);
 workspace.appendChild(roadZone);
 
 /* =========================================================
-   MENU (STATIC TOOLBAR)
+   TOOLBAR UI
    ========================================================= */
 
 menuZone.innerHTML = `
-  <div style="color:#fff; font-family:monospace; padding:10px;">
-    <button id="btnTerrain">Terrain</button>
-    <button id="btnFeature">Feature</button>
-    <button id="btnRoad">Road</button>
-  </div>
+  <button id="btnTerrain">Terrain</button>
+  <button id="btnFeature">Feature</button>
+  <button id="btnRoad">Road</button>
 `;
 
 /* =========================================================
-   LAUNCH SYSTEM (NO AUTO WINDOWS)
+   LAUNCH SYSTEM (ON DEMAND ONLY)
    ========================================================= */
 
 document.getElementById("btnTerrain").onclick = () =>
@@ -212,7 +210,7 @@ document.getElementById("btnRoad").onclick = () =>
   createWidget("road", "widgets/road.html", roadZone);
 
 /* =========================================================
-   INIT
+   DEBUG
    ========================================================= */
 
 console.log("WorldGenEditor initialized:", PROJECT);
