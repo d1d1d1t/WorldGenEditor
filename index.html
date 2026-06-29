@@ -10,52 +10,123 @@
   <link rel="stylesheet" href="assets/css/windows.css">
 
   <style>
-    /* =========================================================
-       GLOBAL GRID LAYOUT
-       ========================================================= */
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
 
-    #workspace {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      grid-template-rows: 60px 1fr 1fr;
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: monospace;
+}
 
-      width: 100vw;
-      height: 100vh;
+/* =========================================================
+   TOOLBAR (SAFE ZONE)
+   ========================================================= */
 
-      background: #000;
-      overflow: hidden;
-    }
+#menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
 
-    .zone {
-      border: 1px solid #222;
-      overflow: hidden;
-      position: relative;
-      background: #111;
-    }
+  background: #111;
+  border-bottom: 1px solid #222;
 
-    .window-title {
-      user-select: none;
-      background: var(--titlebar, #222);
-      padding: 6px 10px;
-      font-size: 13px;
-      height: 28px;
-      box-sizing: border-box;
-      color: #fff;
-    }
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
 
-    .window-body {
-      width: 100%;
-      height: calc(100% - 28px);
-    }
+  z-index: 100;
+}
 
-    .window-body iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-    }
+/* =========================================================
+   MAIN LAYOUT CONTAINER RULE
+   ========================================================= */
 
-  </style>
+#workspace {
+  position: absolute;
+  top: 60px; /* below toolbar */
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  display: flex;
+
+  background: #000;
+  overflow: hidden;
+}
+
+/* =========================================================
+   ZONES (CORE LAYOUT BLOCKS)
+   ========================================================= */
+
+.zone {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #222;
+  background: #111;
+}
+
+/* =========================================================
+   4 : 2 : 1 RATIO SYSTEM
+   ========================================================= */
+
+#terrainZone {
+  flex: 4;
+  min-width: 0;
+}
+
+#featureZone {
+  flex: 2;
+  min-width: 0;
+}
+
+#roadZone {
+  flex: 1;
+  min-width: 0;
+}
+
+/* =========================================================
+   VISUAL SAFETY (prevents iframe overflow bugs)
+   ========================================================= */
+
+.window-title {
+  user-select: none;
+  background: #222;
+  color: white;
+  padding: 6px 10px;
+  font-size: 13px;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.window-body {
+  width: 100%;
+  height: calc(100% - 28px);
+}
+
+.window-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* =========================================================
+   GUARANTEED NEGATIVE SPACE BEHAVIOR
+   ========================================================= */
+
+.zone:not(:last-child) {
+  border-right: 1px solid #111;
+}
+</style>
 </head>
 
 <body>
@@ -68,50 +139,35 @@ import { sendToWidget, MSG } from "./shared/widget-api.js";
 
 const workspace = document.getElementById("workspace");
 
-/* =========================================================
-   ZONE CREATION
-   ========================================================= */
+/* zones */
+const menuZone    = document.createElement("div");
+menuZone.id = "menu";
+menuZone.className = "zone";
 
-function createZone(col, row, colSpan = 1, rowSpan = 1) {
+const terrainZone = document.createElement("div");
+terrainZone.id = "terrainZone";
+terrainZone.className = "zone";
 
-  const zone = document.createElement("div");
-  zone.className = "zone";
+const featureZone = document.createElement("div");
+featureZone.id = "featureZone";
+featureZone.className = "zone";
 
-  zone.style.gridColumn = `${col} / span ${colSpan}`;
-  zone.style.gridRow = `${row} / span ${rowSpan}`;
+const roadZone = document.createElement("div");
+roadZone.id = "roadZone";
+roadZone.className = "zone";
 
-  return zone;
-}
+const padL = document.createElement("div");
+padL.className = "zone padL";
 
-/* =========================================================
-   WIDGET CREATION
-   ========================================================= */
+const padR = document.createElement("div");
+padR.className = "zone padR";
 
-function createWidget(name, url, zone) {
-
-  const title = document.createElement("div");
-  title.className = "window-title";
-  title.textContent = name;
-
-  const body = document.createElement("div");
-  body.className = "window-body";
-
-  const frame = document.createElement("iframe");
-  frame.src = url;
-
-  frame.onload = () => {
-    sendToWidget(frame, {
-      type: MSG.INIT,
-      payload: {
-        name,
-        project: PROJECT
-      }
-    });
-  };
-
-  body.appendChild(frame);
-  zone.appendChild(title);
-  zone.appendChild(body);
+workspace.appendChild(menuZone);
+workspace.appendChild(padL);
+workspace.appendChild(terrainZone);
+workspace.appendChild(featureZone);
+workspace.appendChild(roadZone);
+workspace.appendChild(padR);
 
   return zone;
 }
