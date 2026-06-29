@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Feature Generator</title>
+<title>Feature System</title>
 
 <style>
 
@@ -26,7 +26,6 @@ canvas{
     width:100%;
     height:100%;
     image-rendering:pixelated;
-    transform-origin:center;
 }
 
 </style>
@@ -41,7 +40,7 @@ canvas{
 <script type="module">
 
 /* =========================================================
-   CANVAS (single F block resolution baseline)
+   CANVAS
 ========================================================= */
 
 const canvas =
@@ -54,79 +53,106 @@ canvas.getContext("2d");
    CONSTANTS
 ========================================================= */
 
-const F_WIDTH = 384;
-const F_HEIGHT = 288;
+const W = 384;
+const H = 288;
 
-const ETILE = 16;
+/* HARD SAFE MARGIN */
+const MARGIN = 65;
 
-/* 72px safety margin in WORLD SPACE */
-const SAFE_MARGIN = 72;
+/* feature constraints */
+const MIN_F = 1;
+const MAX_F = 5;
 
-/* feature count range */
-const MIN_FEATURES = 1;
-const MAX_FEATURES = 5;
+/* (f) size reference */
+const F_W = 384;
+const F_H = 288;
 
 /* =========================================================
-   FEATURE MODEL
+   STATE
 ========================================================= */
 
 let features = [];
 
 /* =========================================================
-   SINGLE (F) GENERATION
+   SAFE POSITIONING
 ========================================================= */
 
-function generateF(){
+function safeX(){
 
-    /* one feature block */
+    return Math.floor(
+        MARGIN +
+        Math.random() *
+        (W - MARGIN * 2)
+    );
 
-    const pattern = [];
+}
 
-    const cols = F_WIDTH / ETILE;   // 24
-    const rows = F_HEIGHT / ETILE;  // 18
+function safeY(){
+
+    return Math.floor(
+        MARGIN +
+        Math.random() *
+        (H - MARGIN * 2)
+    );
+
+}
+
+/* =========================================================
+   (F) GENERATION (384×288 footprint)
+========================================================= */
+
+function buildF(){
+
+    const data = [];
+
+    const cols = Math.floor(F_W / 16);
+    const rows = Math.floor(F_H / 16);
 
     for(let y=0;y<rows;y++){
 
         for(let x=0;x<cols;x++){
 
-            /* deterministic-ish density */
-
-            const v =
-                Math.random() > 0.7 ? 1 : 0;
-
-            pattern.push(v);
+            data.push(Math.random() > 0.75 ? 1 : 0);
 
         }
 
     }
 
-    return pattern;
+    return {
+        data,
+        cols,
+        rows
+    };
 
 }
 
 /* =========================================================
-   FEATURE SET GENERATION (1–5 F BLOCKS)
+   FEATURE SET (1–5 F BLOCKS)
 ========================================================= */
 
-function generateFeatures(){
+function generate(){
 
     features = [];
 
     const count =
-        Math.floor(
-            Math.random() *
-            MAX_FEATURES
-        ) + MIN_FEATURES;
+        Math.floor(Math.random() * MAX_F) + MIN_F;
+
+    const baseX = safeX();
+    const baseY = safeY();
 
     for(let i=0;i<count;i++){
 
+        /* horizontal linking offset */
+        const offsetX =
+            i * (F_W - 40); // slight overlap allowance for linking
+
         features.push({
 
-            x: SAFE_MARGIN + i * (F_WIDTH + 20),
+            x: baseX + offsetX,
 
-            y: SAFE_MARGIN,
+            y: baseY,
 
-            data: generateF()
+            f: buildF()
 
         });
 
@@ -140,35 +166,39 @@ function generateFeatures(){
 
 function render(){
 
-    ctx.clearRect(
-        0,0,
-        F_WIDTH,
-        F_HEIGHT
-    );
+    ctx.clearRect(0,0,W,H);
 
-    for(const f of features){
+    for(const fset of features){
 
-        const cols = F_WIDTH / ETILE;
+        const f = fset.f;
 
         for(let i=0;i<f.data.length;i++){
 
-            const v = f.data[i];
+            if(!f.data[i]) continue;
 
-            if(!v) continue;
+            const x = i % f.cols;
+            const y = Math.floor(i / f.cols);
 
-            const x = i % cols;
-            const y = Math.floor(i / cols);
+            const px =
+                fset.x + x * 16;
+
+            const py =
+                fset.y + y * 16;
+
+            /* HARD BOUNDARY CHECK */
+
+            if(
+                px < MARGIN ||
+                py < MARGIN ||
+                px > W - MARGIN ||
+                py > H - MARGIN
+            ){
+                continue;
+            }
 
             ctx.fillStyle = "#ccc";
 
-            ctx.fillRect(
-
-                x * ETILE,
-                y * ETILE,
-                ETILE,
-                ETILE
-
-            );
+            ctx.fillRect(px,py,16,16);
 
         }
 
@@ -177,7 +207,7 @@ function render(){
 }
 
 /* =========================================================
-   ZOOM (SAFE FOR LAYOUT COMPOSITION)
+   ZOOM SUPPORT (VIEW ONLY)
 ========================================================= */
 
 let zoom = 1;
@@ -194,7 +224,7 @@ function setZoom(z){
 window.setFeatureZoom = setZoom;
 
 /* =========================================================
-   HUB MESSAGES
+   MESSAGES
 ========================================================= */
 
 window.addEventListener("message",(e)=>{
@@ -206,12 +236,12 @@ window.addEventListener("message",(e)=>{
     switch(msg.type){
 
         case "INIT":
-            generateFeatures();
+            generate();
             render();
             break;
 
         case "REGENERATE_FEATURES":
-            generateFeatures();
+            generate();
             render();
             break;
 
@@ -223,7 +253,7 @@ window.addEventListener("message",(e)=>{
 
 });
 
-console.log("Feature widget ready (F-system enabled)");
+console.log("Feature system updated (1–5 bounded F blocks)");
 
 </script>
 
