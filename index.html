@@ -10,10 +10,6 @@
 <link rel="stylesheet" href="assets/css/windows.css">
 
 <style>
-/* =========================================================
-   GLOBAL
-   ========================================================= */
-
 html, body {
   margin: 0;
   padding: 0;
@@ -25,7 +21,7 @@ html, body {
 }
 
 /* =========================================================
-   TOOLBAR
+   TOOLBAR (GLOBAL CONTROL)
    ========================================================= */
 
 #menu {
@@ -46,7 +42,7 @@ html, body {
 }
 
 /* =========================================================
-   WORKSPACE (FLEX SYSTEM)
+   WORKSPACE GRID (FIXED CONSTRAINT SYSTEM)
    ========================================================= */
 
 #workspace {
@@ -56,60 +52,71 @@ html, body {
   right: 0;
   bottom: 0;
 
-  display: flex;
-  flex-direction: row;
+  display: grid;
+
+  grid-template-columns: 2fr 2fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+
+  gap: 0;
 
   background: #000;
-  overflow: hidden;
 }
 
 /* =========================================================
-   ZONES
+   ZONES (CORE CELLS)
    ========================================================= */
 
 .zone {
   position: relative;
-  height: 100%;
   overflow: hidden;
   border: 1px solid #222;
   background: #111;
+}
+
+/* =========================================================
+   TERRAIN (2x2 BLOCK)
+   ========================================================= */
+
+#terrainZone {
+  grid-column: 1 / span 2;
+  grid-row: 1 / span 2;
+}
+
+/* =========================================================
+   ROAD (FULL HEIGHT STRIP)
+   ========================================================= */
+
+#roadZone {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+/* =========================================================
+   FEATURE (4:3 CONSTRAINED TOP RIGHT)
+   ========================================================= */
+
+#featureZone {
+  grid-column: 4;
+  grid-row: 1;
+
+  aspect-ratio: 4 / 3;
+}
+
+/* =========================================================
+   TOOLBOX (6:7 BOTTOM RIGHT CELL)
+   ========================================================= */
+
+#menu {
+  grid-column: 4;
+  grid-row: 2;
+
+  background: #111;
+  border-top: 1px solid #222;
+  border-left: 1px solid #222;
+
   display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* =========================================================
-   4 : 2 : 1 SYSTEM (STABLE WEIGHTS)
-   ========================================================= */
-
-#terrainZone { flex: 4; }
-#featureZone { flex: 2; }
-#roadZone { flex: 1; }
-
-/* =========================================================
-   WINDOW FRAME FIXES
-   ========================================================= */
-
-.window-title {
-  user-select: none;
-  background: #222;
-  color: white;
-  padding: 6px 10px;
-  font-size: 13px;
-  height: 28px;
-  box-sizing: border-box;
-}
-
-.window-body {
-  width: 100%;
-  height: calc(100% - 28px);
-}
-
-.window-body iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
+  align-items: center;
+  justify-content: center;
 }
 </style>
 </head>
