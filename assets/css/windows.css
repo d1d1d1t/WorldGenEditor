@@ -1,47 +1,67 @@
-/* ==========================================================================
-   windows.css
-   ========================================================================== */
+/* =========================================================
+   WINDOW CORE
+   ========================================================= */
 
 .window {
-
     position: absolute;
 
     border: 1px solid var(--border);
-
     background: var(--panel);
-
     box-shadow: var(--shadow);
 
+    resize: both;
     overflow: hidden;
 
+    min-width: 300px;
+    min-height: 300px;
+
+    box-sizing: border-box;
+
+    display: block;
 }
 
+/* IMPORTANT: prevents iframe from blocking resize handle */
+.window * {
+    pointer-events: auto;
+}
+
+/* =========================================================
+   TITLE BAR
+   ========================================================= */
+
 .window-title {
-
     user-select: none;
-
     cursor: move;
 
     background: var(--titlebar);
-
     padding: 6px 10px;
 
     font-size: 13px;
 
+    height: 28px;
+    line-height: 16px;
+
+    box-sizing: border-box;
 }
+
+/* =========================================================
+   BODY
+   ========================================================= */
 
 .window-body {
-
     width: 100%;
-    height: calc(100% - 30px);
-
+    height: calc(100% - 28px);
 }
 
-.window-body iframe {
+/* =========================================================
+   IFRAME
+   ========================================================= */
 
+.window-body iframe {
     width: 100%;
     height: 100%;
-
     border: none;
+    display: block;
 
+    pointer-events: auto;
 }

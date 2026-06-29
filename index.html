@@ -8,6 +8,54 @@
   <link rel="stylesheet" href="assets/css/theme.css">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/windows.css">
+
+  <style>
+    /* =========================================================
+       GLOBAL GRID LAYOUT
+       ========================================================= */
+
+    #workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 60px 1fr 1fr;
+
+      width: 100vw;
+      height: 100vh;
+
+      background: #000;
+      overflow: hidden;
+    }
+
+    .zone {
+      border: 1px solid #222;
+      overflow: hidden;
+      position: relative;
+      background: #111;
+    }
+
+    .window-title {
+      user-select: none;
+      background: var(--titlebar, #222);
+      padding: 6px 10px;
+      font-size: 13px;
+      height: 28px;
+      box-sizing: border-box;
+      color: #fff;
+    }
+
+    .window-body {
+      width: 100%;
+      height: calc(100% - 28px);
+    }
+
+    .window-body iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+  </style>
 </head>
 
 <body>
@@ -18,26 +66,40 @@
 import { PROJECT } from "./shared/project.js";
 import { sendToWidget, MSG } from "./shared/widget-api.js";
 
-// ---- prototype window system ----
 const workspace = document.getElementById("workspace");
 
-function createWidget(name, url, x, y) {
+/* =========================================================
+   ZONE CREATION
+   ========================================================= */
+
+function createZone(col, row, colSpan = 1, rowSpan = 1) {
+
+  const zone = document.createElement("div");
+  zone.className = "zone";
+
+  zone.style.gridColumn = `${col} / span ${colSpan}`;
+  zone.style.gridRow = `${row} / span ${rowSpan}`;
+
+  return zone;
+}
+
+/* =========================================================
+   WIDGET CREATION
+   ========================================================= */
+
+function createWidget(name, url, zone) {
+
+  const title = document.createElement("div");
+  title.className = "window-title";
+  title.textContent = name;
+
+  const body = document.createElement("div");
+  body.className = "window-body";
 
   const frame = document.createElement("iframe");
-
   frame.src = url;
 
-  frame.style.position = "absolute";
-  frame.style.left = `${x}px`;
-  frame.style.top = `${y}px`;
-  frame.style.width = "500px";
-  frame.style.height = "500px";
-  frame.style.border = "1px solid #333";
-
-  frame.dataset.widgetName = name;
-
   frame.onload = () => {
-
     sendToWidget(frame, {
       type: MSG.INIT,
       payload: {
@@ -45,45 +107,60 @@ function createWidget(name, url, x, y) {
         project: PROJECT
       }
     });
-
   };
 
-  workspace.appendChild(frame);
+  body.appendChild(frame);
+  zone.appendChild(title);
+  zone.appendChild(body);
 
-  return frame;
+  return zone;
 }
 
-// ---- receive messages from widgets ----
-window.addEventListener("message", (event) => {
-  const msg = event.data;
+/* =========================================================
+   GRID LAYOUT MAP
+   ========================================================= */
 
-  if (!msg || !msg.type) return;
+const menuZone    = createZone(1, 1, 3, 1); // top full width
+const terrainZone = createZone(2, 2, 1, 2); // center column spanning rows
+const featureZone = createZone(3, 2, 1, 1); // upper right
+const roadZone    = createZone(3, 3, 1, 1); // lower right
 
-  switch (msg.type) {
+workspace.appendChild(menuZone);
+workspace.appendChild(terrainZone);
+workspace.appendChild(featureZone);
+workspace.appendChild(roadZone);
 
-    case "LOG":
-      console.log("[Widget]", msg.payload);
-      break;
+/* =========================================================
+   MENU (STATIC TOOLBAR)
+   ========================================================= */
 
-    case "EXPORT":
-      console.log("Export request from widget:", msg);
-      break;
+menuZone.innerHTML = `
+  <div style="color:#fff; font-family:monospace; padding:10px;">
+    <button id="btnTerrain">Terrain</button>
+    <button id="btnFeature">Feature</button>
+    <button id="btnRoad">Road</button>
+  </div>
+`;
 
-    case "SYNC":
-      console.log("Sync data:", msg.payload);
-      break;
+/* =========================================================
+   LAUNCH SYSTEM (NO AUTO WINDOWS)
+   ========================================================= */
 
-    default:
-      console.log("Unknown widget message:", msg);
-  }
-});
+document.getElementById("btnTerrain").onclick = () =>
+  createWidget("terrain", "widgets/terrain.html", terrainZone);
 
-// ---- launch widgets ----
-createWidget("terrain", "widgets/terrain.html", 20, 20);
-createWidget("road", "widgets/road.html", 540, 20);
-createWidget("feature", "widgets/feature.html", 20, 540);
+document.getElementById("btnFeature").onclick = () =>
+  createWidget("feature", "widgets/feature.html", featureZone);
 
-console.log("WorldGenEditor prototype running:", PROJECT);
+document.getElementById("btnRoad").onclick = () =>
+  createWidget("road", "widgets/road.html", roadZone);
+
+/* =========================================================
+   INIT
+   ========================================================= */
+
+console.log("WorldGenEditor initialized:", PROJECT);
+
 </script>
 
 </body>
