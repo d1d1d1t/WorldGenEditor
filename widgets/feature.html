@@ -1,188 +1,229 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Feature Generator</title>
+<meta charset="UTF-8">
+<title>Feature Generator</title>
 
-  <link rel="stylesheet" href="../assets/css/reset.css">
-  <link rel="stylesheet" href="../assets/css/theme.css">
-  <link rel="stylesheet" href="../assets/css/widgets.css">
+<style>
+
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#111;
+}
+
+#wrap{
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+canvas{
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    transform-origin:center;
+}
+
+</style>
 </head>
 
 <body>
 
-<div class="widget">
-  <div class="widget-toolbar">
-    Feature Generator
-    <button id="regen">Regenerate</button>
-  </div>
-
-  <div class="widget-canvas">
-    <canvas id="canvas"></canvas>
-  </div>
+<div id="wrap">
+<canvas id="c" width="384" height="288"></canvas>
 </div>
 
 <script type="module">
 
-import { TILE_SPEC } from "../data/tile-spec.js";
-import { context, clear } from "../shared/bitmap.js";
-import { grayscale } from "../shared/colors.js";
-import { listenToHub } from "../shared/widget-api.js";
-import { PROJECT } from "../shared/project.js";
+/* =========================================================
+   CANVAS (single F block resolution baseline)
+========================================================= */
 
-// -----------------------------
-// Canvas setup (384 × 288)
-// -----------------------------
-const canvas = document.getElementById("canvas");
+const canvas =
+document.getElementById("c");
 
-canvas.width = TILE_SPEC.canvas.feature.width;
-canvas.height = TILE_SPEC.canvas.feature.height;
+const ctx =
+canvas.getContext("2d");
 
-const ctx = context(canvas);
+/* =========================================================
+   CONSTANTS
+========================================================= */
 
-// -----------------------------
-// Seeded RNG
-// -----------------------------
-function rng(seed) {
-  let t = seed;
-  return function () {
-    t ^= t << 13;
-    t ^= t >> 17;
-    t ^= t << 5;
-    return (t >>> 0) / 4294967296;
-  };
-}
+const F_WIDTH = 384;
+const F_HEIGHT = 288;
 
-let seed = PROJECT.seed;
+const ETILE = 16;
 
-// -----------------------------
-// Feature system parameters
-// -----------------------------
-const eTile = TILE_SPEC.micro.feature.width; // 16px grid unit
+/* 72px safety margin in WORLD SPACE */
+const SAFE_MARGIN = 72;
 
-const cols = Math.floor(canvas.width / eTile);  // 24
-const rows = Math.floor(canvas.height / eTile); // 18
+/* feature count range */
+const MIN_FEATURES = 1;
+const MAX_FEATURES = 5;
 
-// -----------------------------
-// Cluster generation
-// -----------------------------
-function generateFeatures() {
+/* =========================================================
+   FEATURE MODEL
+========================================================= */
 
-  clear(ctx, "#000");
+let features = [];
 
-  const random = rng(seed);
+/* =========================================================
+   SINGLE (F) GENERATION
+========================================================= */
 
-  // density map (0 empty, 1 max feature presence)
-  const grid = Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => 0)
-  );
+function generateF(){
 
-  // seed initial clusters
-  const seedCount = 6;
+    /* one feature block */
 
-  const seeds = [];
+    const pattern = [];
 
-  for (let i = 0; i < seedCount; i++) {
+    const cols = F_WIDTH / ETILE;   // 24
+    const rows = F_HEIGHT / ETILE;  // 18
 
-    const x = Math.floor(random() * cols);
-    const y = Math.floor(random() * rows);
+    for(let y=0;y<rows;y++){
 
-    grid[y][x] = 1;
-    seeds.push({ x, y });
+        for(let x=0;x<cols;x++){
 
-  }
+            /* deterministic-ish density */
 
-  // growth iterations
-  const steps = 18;
+            const v =
+                Math.random() > 0.7 ? 1 : 0;
 
-  for (let s = 0; s < steps; s++) {
+            pattern.push(v);
 
-    const newSeeds = [];
-
-    for (const seed of seeds) {
-
-      const dirs = [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1]
-      ];
-
-      for (const d of dirs) {
-
-        if (random() > 0.55) continue;
-
-        const nx = seed.x + d[0];
-        const ny = seed.y + d[1];
-
-        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
-
-        const strength = Math.max(0, grid[seed.y][seed.x] - 0.15);
-
-        if (strength > grid[ny][nx]) {
-          grid[ny][nx] = strength;
-          newSeeds.push({ x: nx, y: ny });
         }
-      }
+
     }
 
-    seeds.push(...newSeeds);
-  }
+    return pattern;
 
-  // render
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-
-      const v = grid[y][x];
-
-      if (v <= 0) continue;
-
-      let shade;
-
-      if (v > 0.8) shade = 0.90;
-      else if (v > 0.6) shade = 0.65;
-      else if (v > 0.4) shade = 0.55;
-      else if (v > 0.2) shade = 0.30;
-      else shade = 0.20;
-
-      ctx.fillStyle = grayscale(shade * 255);
-
-      ctx.fillRect(
-        x * eTile,
-        y * eTile,
-        eTile,
-        eTile
-      );
-    }
-  }
 }
 
-// -----------------------------
-// UI
-// -----------------------------
-document.getElementById("regen").addEventListener("click", () => {
-  seed = Math.floor(Math.random() * 1e9);
-  generateFeatures();
-});
+/* =========================================================
+   FEATURE SET GENERATION (1–5 F BLOCKS)
+========================================================= */
 
-// -----------------------------
-// Hub communication
-// -----------------------------
-listenToHub((msg) => {
+function generateFeatures(){
 
-  if (msg.type === "INIT") {
+    features = [];
 
-    if (msg.payload?.project?.seed) {
-      seed = msg.payload.project.seed;
+    const count =
+        Math.floor(
+            Math.random() *
+            MAX_FEATURES
+        ) + MIN_FEATURES;
+
+    for(let i=0;i<count;i++){
+
+        features.push({
+
+            x: SAFE_MARGIN + i * (F_WIDTH + 20),
+
+            y: SAFE_MARGIN,
+
+            data: generateF()
+
+        });
+
     }
 
-    generateFeatures();
-  }
+}
+
+/* =========================================================
+   RENDER
+========================================================= */
+
+function render(){
+
+    ctx.clearRect(
+        0,0,
+        F_WIDTH,
+        F_HEIGHT
+    );
+
+    for(const f of features){
+
+        const cols = F_WIDTH / ETILE;
+
+        for(let i=0;i<f.data.length;i++){
+
+            const v = f.data[i];
+
+            if(!v) continue;
+
+            const x = i % cols;
+            const y = Math.floor(i / cols);
+
+            ctx.fillStyle = "#ccc";
+
+            ctx.fillRect(
+
+                x * ETILE,
+                y * ETILE,
+                ETILE,
+                ETILE
+
+            );
+
+        }
+
+    }
+
+}
+
+/* =========================================================
+   ZOOM (SAFE FOR LAYOUT COMPOSITION)
+========================================================= */
+
+let zoom = 1;
+
+function setZoom(z){
+
+    zoom = z;
+
+    canvas.style.transform =
+        `scale(${zoom})`;
+
+}
+
+window.setFeatureZoom = setZoom;
+
+/* =========================================================
+   HUB MESSAGES
+========================================================= */
+
+window.addEventListener("message",(e)=>{
+
+    const msg = e.data;
+
+    if(!msg) return;
+
+    switch(msg.type){
+
+        case "INIT":
+            generateFeatures();
+            render();
+            break;
+
+        case "REGENERATE_FEATURES":
+            generateFeatures();
+            render();
+            break;
+
+        case "FEATURE_ZOOM":
+            setZoom(msg.payload.zoom);
+            break;
+
+    }
 
 });
 
-// initial render
-generateFeatures();
+console.log("Feature widget ready (F-system enabled)");
 
 </script>
 

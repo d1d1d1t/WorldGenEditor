@@ -1,140 +1,236 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Road Generator</title>
+<meta charset="UTF-8">
+<title>Road Generator</title>
 
-  <link rel="stylesheet" href="../assets/css/reset.css">
-  <link rel="stylesheet" href="../assets/css/theme.css">
-  <link rel="stylesheet" href="../assets/css/widgets.css">
+<style>
+
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#111;
+}
+
+#wrap{
+    width:100%;
+    height:100%;
+    display:flex;
+}
+
+canvas{
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+}
+
+</style>
 </head>
 
 <body>
 
-<div class="widget">
-  <div class="widget-toolbar">
-    Road Generator
-    <button id="regen">Regenerate</button>
-  </div>
-
-  <div class="widget-canvas">
-    <canvas id="canvas"></canvas>
-  </div>
+<div id="wrap">
+<canvas id="c" width="192" height="1920"></canvas>
 </div>
 
 <script type="module">
 
-import { TILE_SPEC } from "../data/tile-spec.js";
-import { context, clear } from "../shared/bitmap.js";
-import { grayscale } from "../shared/colors.js";
-import { listenToHub } from "../shared/widget-api.js";
-import { PROJECT } from "../shared/project.js";
+/* =========================================================
+   CANVAS
+========================================================= */
 
-// -----------------------------
-// Canvas setup (192 × 1920)
-// -----------------------------
-const canvas = document.getElementById("canvas");
+const canvas =
+document.getElementById("c");
 
-canvas.width = TILE_SPEC.canvas.road.width;
-canvas.height = TILE_SPEC.canvas.road.height;
+const ctx =
+canvas.getContext("2d");
 
-const ctx = context(canvas);
+/* =========================================================
+   CONFIG
+========================================================= */
 
-// -----------------------------
-// Seeded RNG
-// -----------------------------
-function rng(seed) {
-  let t = seed;
-  return function () {
-    t ^= t << 13;
-    t ^= t >> 17;
-    t ^= t << 5;
-    return (t >>> 0) / 4294967296;
-  };
-}
+const config = {
 
-let seed = PROJECT.seed;
+    cord:0.75,     // road tightness to terrain
 
-// -----------------------------
-// Road generation (strip logic)
-// -----------------------------
-function generateRoad() {
+    invert:false,  // flip influence
 
-  clear(ctx, "#000");
+    tileW:48,
 
-  const random = rng(seed);
+    tileH:32
 
-  const width = TILE_SPEC.canvas.road.width;   // 192px
-  const height = TILE_SPEC.canvas.road.height; // 1920px
+};
 
-  const rTileW = TILE_SPEC.micro.road.width;   // 48
-  const rTileH = TILE_SPEC.micro.road.height;  // 32
+/* =========================================================
+   STATE
+========================================================= */
 
-  const cols = Math.floor(width / rTileW);   // ~4 columns
-  const rows = Math.floor(height / rTileH);  // ~60 rows
+let edgeProfile = null;
 
-  // simple path bias center column
-  let centerX = Math.floor(cols / 2);
+let spine = [];
 
-  for (let y = 0; y < rows; y++) {
+/* =========================================================
+   MESSAGE IN
+========================================================= */
 
-    // slight wandering path
-    if (random() > 0.7) {
-      centerX += random() > 0.5 ? 1 : -1;
+window.addEventListener("message", (e)=>{
+
+    const msg = e.data;
+
+    if(!msg) return;
+
+    if(msg.type === "ROAD_EDGE_PROFILE"){
+
+        edgeProfile = msg.payload;
+
+        generateRoad();
+
     }
 
-    centerX = Math.max(0, Math.min(cols - 1, centerX));
-
-    for (let x = 0; x < cols; x++) {
-
-      const dist = Math.abs(x - centerX);
-
-      // road intensity falloff
-      let value;
-
-      if (dist === 0) value = 0.90;
-      else if (dist === 1) value = 0.65;
-      else if (dist === 2) value = 0.40;
-      else value = 0.20;
-
-      ctx.fillStyle = grayscale(value * 255);
-
-      ctx.fillRect(
-        x * rTileW,
-        y * rTileH,
-        rTileW,
-        rTileH
-      );
-    }
-  }
-}
-
-// -----------------------------
-// UI
-// -----------------------------
-document.getElementById("regen").addEventListener("click", () => {
-  seed = Math.floor(Math.random() * 1e9);
-  generateRoad();
 });
 
-// -----------------------------
-// Hub communication
-// -----------------------------
-listenToHub((msg) => {
+/* =========================================================
+   CORE ROAD GENERATION
+========================================================= */
 
-  if (msg.type === "INIT") {
+function generateRoad(){
 
-    if (msg.payload?.project?.seed) {
-      seed = msg.payload.project.seed;
+    if(!edgeProfile) return;
+
+    const right = edgeProfile.right;
+
+    const rows = Math.floor(canvas.height / config.tileH);
+
+    const cols = Math.floor(canvas.width / config.tileW);
+
+    spine = [];
+
+    const centerBase = Math.floor(cols / 2);
+
+    for(let y=0;y<rows;y++){
+
+        /* -----------------------------------------
+           SAMPLE TERRAIN INFLUENCE
+        ------------------------------------------ */
+
+        const raw =
+            right[y % right.length];
+
+        let influence =
+            raw / 255;
+
+        if(config.invert){
+
+            influence =
+                1 - influence;
+
+        }
+
+        /* -----------------------------------------
+           CORD SYSTEM (attraction strength)
+        ------------------------------------------ */
+
+        const offset =
+            (influence - 0.5)
+            * config.cord
+            * cols;
+
+        let x =
+            Math.round(centerBase + offset);
+
+        x = Math.max(0, Math.min(cols-1, x));
+
+        spine.push(x);
+
     }
+
+    render();
+
+}
+
+/* =========================================================
+   RENDER ROAD
+========================================================= */
+
+function render(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const rows =
+        spine.length;
+
+    const cols =
+        Math.floor(canvas.width / config.tileW);
+
+    for(let y=0;y<rows;y++){
+
+        const center =
+            spine[y];
+
+        for(let x=0;x<cols;x++){
+
+            const dist =
+                Math.abs(x-center);
+
+            let v;
+
+            /* -------------------------------------
+               ROAD FALLOFF MODEL
+            -------------------------------------- */
+
+            if(dist===0) v=0.95;
+            else if(dist===1) v=0.70;
+            else if(dist===2) v=0.45;
+            else v=0.20;
+
+            const c =
+                Math.floor(v*255);
+
+            ctx.fillStyle =
+                `rgb(${c},${c},${c})`;
+
+            ctx.fillRect(
+
+                x*config.tileW,
+                y*config.tileH,
+                config.tileW,
+                config.tileH
+
+            );
+
+        }
+
+    }
+
+}
+
+/* =========================================================
+   OPTIONAL CONTROLS (DEBUG)
+========================================================= */
+
+window.setRoadCord = (v)=>{
+
+    config.cord = v;
 
     generateRoad();
-  }
 
-});
+};
 
-// initial render
-generateRoad();
+window.setRoadInvert = (v)=>{
+
+    config.invert = v;
+
+    generateRoad();
+
+};
+
+/* =========================================================
+   INIT (EMPTY UNTIL TERRAIN ARRIVES)
+========================================================= */
+
+console.log("Road widget ready");
 
 </script>
 

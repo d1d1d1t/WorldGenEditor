@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="UTF-8">
+
 <title>WorldGenEditor</title>
 
 <link rel="stylesheet" href="assets/css/reset.css">
@@ -10,217 +12,359 @@
 <link rel="stylesheet" href="assets/css/windows.css">
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #000;
-  font-family: monospace;
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+html,
+body{
+
+    margin:0;
+    padding:0;
+
+    width:100%;
+    height:100%;
+
+    overflow:hidden;
+
+    background:#000;
+
+    font-family:monospace;
+
 }
 
 /* =========================================================
-   TOOLBAR (GLOBAL CONTROL)
+   LAYOUT
    ========================================================= */
 
-#menu {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
+#workspace{
 
-  background: #111;
-  border-bottom: 1px solid #222;
+    position:absolute;
 
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
+    inset:0;
 
-  z-index: 100;
+    display:grid;
+
+    grid-template-columns:2fr 2fr 1fr 1fr;
+
+    grid-template-rows:1fr 1fr;
+
+    background:#000;
+
 }
 
 /* =========================================================
-   WORKSPACE GRID (FIXED CONSTRAINT SYSTEM)
+   CELLS
    ========================================================= */
 
-#workspace {
-  position: absolute;
-  top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.zone{
 
-  display: grid;
+    position:relative;
 
-  grid-template-columns: 2fr 2fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+    overflow:hidden;
 
-  gap: 0;
+    border:1px solid #222;
 
-  background: #000;
+    background:#111;
+
 }
 
-/* =========================================================
-   ZONES (CORE CELLS)
-   ========================================================= */
+/* terrain */
 
-.zone {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid #222;
-  background: #111;
+#terrainZone{
+
+    grid-column:1 / span 2;
+
+    grid-row:1 / span 2;
+
 }
 
-/* =========================================================
-   TERRAIN (2x2 BLOCK)
-   ========================================================= */
+/* road */
 
-#terrainZone {
-  grid-column: 1 / span 2;
-  grid-row: 1 / span 2;
+#roadZone{
+
+    grid-column:3;
+
+    grid-row:1 / span 2;
+
 }
 
-/* =========================================================
-   ROAD (FULL HEIGHT STRIP)
-   ========================================================= */
+/* feature */
 
-#roadZone {
-  grid-column: 3;
-  grid-row: 1 / span 2;
+#featureZone{
+
+    grid-column:4;
+
+    grid-row:1;
+
+    aspect-ratio:4 / 3;
+
 }
 
-/* =========================================================
-   FEATURE (4:3 CONSTRAINED TOP RIGHT)
-   ========================================================= */
+/* toolbox */
 
-#featureZone {
-  grid-column: 4;
-  grid-row: 1;
+#toolboxZone{
 
-  aspect-ratio: 4 / 3;
+    grid-column:4;
+
+    grid-row:2;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:8px;
+
 }
 
-/* =========================================================
-   TOOLBOX (6:7 BOTTOM RIGHT CELL)
-   ========================================================= */
+button{
 
-#menu {
-  grid-column: 4;
-  grid-row: 2;
+    padding:8px 12px;
 
-  background: #111;
-  border-top: 1px solid #222;
-  border-left: 1px solid #222;
+    cursor:pointer;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
+
+iframe{
+
+    width:100%;
+
+    height:100%;
+
+    border:none;
+
+    display:block;
+
+}
+
 </style>
+
 </head>
 
 <body>
 
-<!-- TOOLBAR -->
-<div id="menu"></div>
+<div id="workspace">
 
-<!-- WORKSPACE -->
-<div id="workspace"></div>
+<div id="terrainZone" class="zone"></div>
+
+<div id="roadZone" class="zone"></div>
+
+<div id="featureZone" class="zone"></div>
+
+<div id="toolboxZone" class="zone">
+
+<button id="terrainBtn">Terrain</button>
+
+<button id="roadBtn">Road</button>
+
+<button id="featureBtn">Feature</button>
+
+</div>
+
+</div>
 
 <script type="module">
 
 import { PROJECT } from "./shared/project.js";
-import { sendToWidget, MSG } from "./shared/widget-api.js";
 
-const workspace = document.getElementById("workspace");
-const menuZone = document.getElementById("menu");
+import { MSG } from "./shared/widget-api.js";
 
-/* =========================================================
-   WIDGET CREATION SYSTEM
-   ========================================================= */
+/* ==========================================================
+    ZONES
+========================================================== */
 
-function createWidget(name, url, zone) {
+const terrainZone =
+document.getElementById("terrainZone");
 
-  // container frame wrapper
-  const wrapper = document.createElement("div");
-  wrapper.style.width = "100%";
-  wrapper.style.height = "100%";
-  wrapper.style.display = "flex";
-  wrapper.style.flexDirection = "column";
+const roadZone =
+document.getElementById("roadZone");
 
-  // iframe
-  const frame = document.createElement("iframe");
-  frame.src = url;
-  frame.style.flex = "1";
-  frame.style.border = "none";
+const featureZone =
+document.getElementById("featureZone");
 
-  frame.onload = () => {
-    sendToWidget(frame, {
-      type: MSG.INIT,
-      payload: {
-        name,
-        project: PROJECT
-      }
-    });
-  };
+/* ==========================================================
+    WIDGET REFERENCES
+========================================================== */
 
-  wrapper.appendChild(frame);
-  zone.appendChild(wrapper);
+const widgets={
 
-  return wrapper;
+    terrain:null,
+
+    road:null,
+
+    feature:null
+
+};
+
+/* ==========================================================
+    CREATE
+========================================================== */
+
+function launchWidget(name,url,zone){
+
+    if(widgets[name]){
+
+        return;
+
+    }
+
+    const frame=
+    document.createElement("iframe");
+
+    frame.src=url;
+
+    frame.onload=()=>{
+
+        frame.contentWindow.postMessage({
+
+            type:MSG.INIT,
+
+            payload:{
+
+                name,
+
+                project:PROJECT
+
+            }
+
+        },"*");
+
+    };
+
+    zone.innerHTML="";
+
+    zone.appendChild(frame);
+
+    widgets[name]=frame;
+
 }
 
-/* =========================================================
-   ZONES (SINGLE SOURCE OF TRUTH)
-   ========================================================= */
+/* ==========================================================
+    BUTTONS
+========================================================== */
 
-const terrainZone = document.createElement("div");
-terrainZone.id = "terrainZone";
-terrainZone.className = "zone";
+terrainBtn.onclick=()=>{
 
-const featureZone = document.createElement("div");
-featureZone.id = "featureZone";
-featureZone.className = "zone";
+    launchWidget(
 
-const roadZone = document.createElement("div");
-roadZone.id = "roadZone";
-roadZone.className = "zone";
+        "terrain",
 
-/* append zones */
-workspace.appendChild(terrainZone);
-workspace.appendChild(featureZone);
-workspace.appendChild(roadZone);
+        "widgets/terrain.html",
 
-/* =========================================================
-   TOOLBAR UI
-   ========================================================= */
+        terrainZone
 
-menuZone.innerHTML = `
-  <button id="btnTerrain">Terrain</button>
-  <button id="btnFeature">Feature</button>
-  <button id="btnRoad">Road</button>
-`;
+    );
 
-/* =========================================================
-   LAUNCH SYSTEM (ON DEMAND ONLY)
-   ========================================================= */
+};
 
-document.getElementById("btnTerrain").onclick = () =>
-  createWidget("terrain", "widgets/terrain.html", terrainZone);
+roadBtn.onclick=()=>{
 
-document.getElementById("btnFeature").onclick = () =>
-  createWidget("feature", "widgets/feature.html", featureZone);
+    launchWidget(
 
-document.getElementById("btnRoad").onclick = () =>
-  createWidget("road", "widgets/road.html", roadZone);
+        "road",
 
-/* =========================================================
-   DEBUG
-   ========================================================= */
+        "widgets/road.html",
 
-console.log("WorldGenEditor initialized:", PROJECT);
+        roadZone
+
+    );
+
+};
+
+featureBtn.onclick=()=>{
+
+    launchWidget(
+
+        "feature",
+
+        "widgets/feature.html",
+
+        featureZone
+
+    );
+
+};
+
+/* ==========================================================
+    HUB ROUTER
+========================================================== */
+
+window.addEventListener(
+
+"message",
+
+event=>{
+
+const msg=event.data;
+
+if(!msg)return;
+
+/* --------------------------------------------
+   TERRAIN -> ROAD
+--------------------------------------------- */
+
+if(
+
+msg.type==="TERRAIN_EDGE_PROFILE"
+
+){
+
+if(widgets.road){
+
+widgets.road.contentWindow.postMessage({
+
+type:"ROAD_EDGE_PROFILE",
+
+payload:msg.payload
+
+},"*");
+
+}
+
+}
+
+/* --------------------------------------------
+   ROAD -> OVERPASS
+--------------------------------------------- */
+
+if(
+
+msg.type==="ROAD_PROFILE"
+
+){
+
+// future
+
+}
+
+/* --------------------------------------------
+   FEATURE -> HUB
+--------------------------------------------- */
+
+if(
+
+msg.type==="FEATURE_PROFILE"
+
+){
+
+// future
+
+}
+
+}
+
+);
+
+console.log(
+
+"WorldGenEditor Ready",
+
+PROJECT
+
+);
 
 </script>
 

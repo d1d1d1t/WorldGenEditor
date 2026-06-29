@@ -5,137 +5,337 @@
 <title>Terrain (t) Generator</title>
 
 <style>
-body {
-    margin: 0;
-    background: #111;
-    overflow: hidden;
+
+html,
+body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#111;
 }
 
-/* =========================================================
-   CANVAS MUST ALWAYS BE SQUARE VISUALLY
-   ========================================================= */
-
-#wrap {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+#wrap{
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
 }
 
-/* THIS is the key fix */
-canvas {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: 1 / 1;
+canvas{
 
-    image-rendering: pixelated;
-    display: block;
+    width:100%;
+    height:100%;
+
+    aspect-ratio:1/1;
+
+    display:block;
+
+    image-rendering:pixelated;
+
 }
+
 </style>
 </head>
 
 <body>
 
 <div id="wrap">
-<canvas id="c" width="1920" height="1920"></canvas>
+<canvas id="terrainCanvas"
+        width="1920"
+        height="1920"></canvas>
 </div>
 
 <script type="module">
 
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
+/* ==========================================================
+    TERRAIN CONSTANTS
+========================================================== */
 
 const GRID_SIZE = 10;
+
 const TILE_SIZE = 192;
 
-const VALUES = [255, 191, 128, 64, 26];
+const EXPORT_SIZE = 1920;
 
-/* =========================================================
-   GENERATION
-   ========================================================= */
+const HEIGHT_VALUES = [
 
-function rand() {
-    return VALUES[Math.floor(Math.random() * VALUES.length)];
+    255,
+    191,
+    128,
+    64,
+    26
+
+];
+
+/* ==========================================================
+    CANVAS
+========================================================== */
+
+const canvas =
+    document.getElementById("terrainCanvas");
+
+const ctx =
+    canvas.getContext("2d");
+
+/* ==========================================================
+    TERRAIN OBJECT
+========================================================== */
+
+const terrain = {
+
+    grid:[],
+
+    edgeProfiles:{
+
+        top:[],
+
+        bottom:[],
+
+        left:[],
+
+        right:[]
+
+    }
+
+};
+
+/* ==========================================================
+    RANDOM HEIGHT
+========================================================== */
+
+function randomHeight(){
+
+    return HEIGHT_VALUES[
+        Math.floor(
+            Math.random()*HEIGHT_VALUES.length
+        )
+    ];
+
 }
 
-function buildGrid() {
-    const grid = Array.from({ length: GRID_SIZE }, () =>
-        Array(GRID_SIZE).fill(0)
-    );
+/* ==========================================================
+    BUILD GRID
+========================================================== */
 
-    let white = 0;
+function buildGrid(){
 
-    for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
+    terrain.grid =
+        Array.from(
 
-            let v = rand();
+            {length:GRID_SIZE},
 
-            if (v === 255 && white >= 4) {
-                v = 128;
+            ()=>Array(GRID_SIZE).fill(0)
+
+        );
+
+    let whiteCount=0;
+
+    for(let y=0;y<GRID_SIZE;y++){
+
+        for(let x=0;x<GRID_SIZE;x++){
+
+            let v=randomHeight();
+
+            if(v===255 && whiteCount>=4){
+
+                v=128;
+
             }
 
-            grid[y][x] = v;
+            terrain.grid[y][x]=v;
 
-            if (v === 255) white++;
+            if(v===255){
+
+                whiteCount++;
+
+            }
+
         }
+
     }
 
-    // enforce center anchor
-    grid[5][5] = 255;
+    terrain.grid[5][5]=255;
 
-    return grid;
 }
 
-/* =========================================================
-   RENDER (ALWAYS 1920x1920 INTERNAL)
-   ========================================================= */
+/* ==========================================================
+    BUILD EDGE PROFILES
+========================================================== */
 
-function draw(grid) {
+function buildEdgeProfiles(){
 
-    ctx.clearRect(0, 0, 1920, 1920);
+    terrain.edgeProfiles.top =
+        [...terrain.grid[0]];
 
-    for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
+    terrain.edgeProfiles.bottom =
+        [...terrain.grid[GRID_SIZE-1]];
 
-            const v = grid[y][x];
+    terrain.edgeProfiles.left =
+        terrain.grid.map(r=>r[0]);
 
-            ctx.fillStyle = `rgb(${v},${v},${v})`;
+    terrain.edgeProfiles.right =
+        terrain.grid.map(r=>r[GRID_SIZE-1]);
+
+}
+
+/* ==========================================================
+    DRAW TERRAIN
+========================================================== */
+
+function drawTerrain(){
+
+    ctx.clearRect(
+
+        0,
+        0,
+        EXPORT_SIZE,
+        EXPORT_SIZE
+
+    );
+
+    for(let y=0;y<GRID_SIZE;y++){
+
+        for(let x=0;x<GRID_SIZE;x++){
+
+            const v=
+                terrain.grid[y][x];
+
+            ctx.fillStyle=
+                `rgb(${v},${v},${v})`;
 
             ctx.fillRect(
-                x * TILE_SIZE,
-                y * TILE_SIZE,
+
+                x*TILE_SIZE,
+
+                y*TILE_SIZE,
+
                 TILE_SIZE,
+
                 TILE_SIZE
+
             );
+
         }
+
     }
+
 }
 
-/* =========================================================
-   EXPORT (ALWAYS TRUE 1920x1920)
-   ========================================================= */
+/* ==========================================================
+    EXPORT
+========================================================== */
 
-function exportCanvas() {
-    const link = document.createElement("a");
-    link.download = "terrain_1920.jpg";
-    link.href = canvas.toDataURL("image/jpeg", 1.0);
+function exportTerrain(){
+
+    const link=
+        document.createElement("a");
+
+    link.download="terrain_1920.jpg";
+
+    link.href=
+        canvas.toDataURL(
+
+            "image/jpeg",
+
+            1.0
+
+        );
+
     link.click();
+
 }
 
-/* =========================================================
-   INIT
-   ========================================================= */
+/* ==========================================================
+    SEND EDGE PROFILE
+========================================================== */
 
-const grid = buildGrid();
-draw(grid);
+function notifyHub(){
 
-/* optional hook for hub button */
-window.addEventListener("message", (e) => {
-    if (e.data?.type === "EXPORT_TERRAIN") {
-        exportCanvas();
+    window.parent.postMessage({
+
+        type:"TERRAIN_EDGE_PROFILE",
+
+        payload:{
+
+            top:
+                terrain.edgeProfiles.top,
+
+            bottom:
+                terrain.edgeProfiles.bottom,
+
+            left:
+                terrain.edgeProfiles.left,
+
+            right:
+                terrain.edgeProfiles.right
+
+        }
+
+    },"*");
+
+}
+
+/* ==========================================================
+    GENERATE
+========================================================== */
+
+function generateTerrain(){
+
+    buildGrid();
+
+    buildEdgeProfiles();
+
+    drawTerrain();
+
+    notifyHub();
+
+}
+
+/* ==========================================================
+    HUB MESSAGES
+========================================================== */
+
+window.addEventListener(
+
+    "message",
+
+    e=>{
+
+        const msg=e.data;
+
+        if(!msg)return;
+
+        switch(msg.type){
+
+            case "EXPORT_TERRAIN":
+
+                exportTerrain();
+
+                break;
+
+            case "REGENERATE_TERRAIN":
+
+                generateTerrain();
+
+                break;
+
+        }
+
     }
-});
+
+);
+
+/* ==========================================================
+    INITIALIZE
+========================================================== */
+
+generateTerrain();
+
+console.log(
+    "Terrain widget ready."
+);
 
 </script>
 
