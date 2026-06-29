@@ -1,0 +1,39 @@
+/* ==========================================================================
+   WorldGenEditor
+   reset.css
+   Basic browser reset.
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    line-height: 1;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+canvas {
+    display: block;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+}

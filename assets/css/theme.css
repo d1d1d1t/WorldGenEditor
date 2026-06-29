@@ -1,0 +1,37 @@
+/* ==========================================================================
+   WorldGenEditor
+   theme.css
+   Global colors and typography.
+   ========================================================================== */
+
+:root {
+
+    --background: #1b1b1b;
+    --panel: #2a2a2a;
+
+    --titlebar: #353535;
+
+    --border: #555;
+
+    --text: #dddddd;
+    --accent: #5aa9ff;
+
+    --shadow:
+        0 4px 10px rgba(0,0,0,.35);
+
+    --font:
+        Consolas,
+        "Courier New",
+        monospace;
+
+}
+
+body {
+
+    background: var(--background);
+
+    color: var(--text);
+
+    font-family: var(--font);
+
+}

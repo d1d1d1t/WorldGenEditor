@@ -1,0 +1,47 @@
+/* ==========================================================================
+   windows.css
+   ========================================================================== */
+
+.window {
+
+    position: absolute;
+
+    border: 1px solid var(--border);
+
+    background: var(--panel);
+
+    box-shadow: var(--shadow);
+
+    overflow: hidden;
+
+}
+
+.window-title {
+
+    user-select: none;
+
+    cursor: move;
+
+    background: var(--titlebar);
+
+    padding: 6px 10px;
+
+    font-size: 13px;
+
+}
+
+.window-body {
+
+    width: 100%;
+    height: calc(100% - 30px);
+
+}
+
+.window-body iframe {
+
+    width: 100%;
+    height: 100%;
+
+    border: none;
+
+}

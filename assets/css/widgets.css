@@ -1,0 +1,31 @@
+/* ==========================================================================
+   widgets.css
+   ========================================================================== */
+
+.widget {
+
+    display: flex;
+    flex-direction: column;
+
+    width: 100%;
+    height: 100%;
+
+}
+
+.widget-toolbar {
+
+    padding: 8px;
+
+}
+
+.widget-canvas {
+
+    flex: 1;
+
+}
+
+.widget-canvas canvas {
+
+    display: block;
+
+}
