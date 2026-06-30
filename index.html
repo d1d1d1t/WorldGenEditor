@@ -4,280 +4,215 @@
 <meta charset="UTF-8">
 <title>WorldGenEditor</title>
 
+<link rel="stylesheet" href="assets/css/reset.css">
+<link rel="stylesheet" href="assets/css/theme.css">
+
 <style>
 
-/* =========================================================
-   GLOBAL
-========================================================= */
+/* ================================
+   ABSOLUTE CUBE LAYOUT
+================================ */
 
-html,body{
-    margin:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#000;
-    font-family:monospace;
+html, body {
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  font-family: monospace;
 }
 
-/* =========================================================
-   VIEWPORT ROOT
-========================================================= */
+/* GRID IS NOW STATIC */
+#workspace {
+  position:absolute;
+  top:60px;
+  left:0;
+  right:0;
+  bottom:0;
 
-#viewport{
+  display:grid;
 
-    width:100%;
-    height:100%;
-
-    display:flex;
-
-    justify-content:center;
-    align-items:center;
-
+  grid-template-columns: 2fr 2fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
 }
 
-/* =========================================================
-   FITTING CONTAINER (IMPORTANT)
-========================================================= */
-
-#frame{
-
-    width:95vw;
-    height:95vh;
-
-    display:grid;
-
-    grid-template-columns: 2fr 2fr 1fr 1fr;
-    grid-template-rows: 2fr 1fr;
-
-    gap:6px;
-
-    transform-origin:center;
-
+/* PANES */
+.zone {
+  position:relative;
+  overflow:hidden;
+  border:1px solid #222;
+  background:#111;
 }
 
-/* =========================================================
-   ZONES (DISPLAY PANES ONLY)
-========================================================= */
-
-.zone{
-
-    position:relative;
-
-    overflow:hidden;
-
-    border:1px solid #222;
-
-    background:#111;
-
-    display:flex;
-
+/* TERRAIN 2x2 */
+#terrain {
+  grid-column:1 / span 2;
+  grid-row:1 / span 2;
 }
 
-/* terrain (visual pane only) */
-
-#terrainZone{
-    grid-column:1 / span 2;
-    grid-row:1 / span 2;
+/* ROAD STRIP */
+#road {
+  grid-column:3;
+  grid-row:1 / span 2;
 }
 
-/* road */
-
-#roadZone{
-    grid-column:3;
-    grid-row:1 / span 2;
+/* FEATURE TOP RIGHT */
+#feature {
+  grid-column:4;
+  grid-row:1;
 }
 
-/* feature */
-
-#featureZone{
-    grid-column:4;
-    grid-row:1;
+/* TOOLBOX BOTTOM RIGHT */
+#toolbox {
+  grid-column:4;
+  grid-row:2;
+  background:#0f0f0f;
+  border-top:1px solid #222;
 }
-
-/* toolbox */
-
-#toolboxZone{
-    grid-column:4;
-    grid-row:2;
-
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    gap:8px;
-
-    background:#0b0b0b;
-}
-
-/* =========================================================
-   IFRAME BEHAVIOR (CRITICAL FIX)
-========================================================= */
-
-iframe{
-
-    width:100%;
-    height:100%;
-
-    border:none;
-
-}
-
-/* =========================================================
-   BUTTONS
-========================================================= */
-
-button{
-
-    padding:6px 10px;
-
-    background:#222;
-
-    border:1px solid #333;
-
-    color:#fff;
-
-    cursor:pointer;
-
-}
-
-button:hover{
-    background:#333;
-}
-
 </style>
 </head>
 
 <body>
 
-<div id="viewport">
-
-<div id="frame">
-
-    <div id="terrainZone" class="zone"></div>
-
-    <div id="roadZone" class="zone"></div>
-
-    <div id="featureZone" class="zone"></div>
-
-    <div id="toolboxZone" class="zone">
-
-        <button id="btnTerrain">Terrain</button>
-        <button id="btnRoad">Road</button>
-        <button id="btnFeature">Feature</button>
-
-    </div>
-
-</div>
-
-</div>
+<div id="toolbox"></div>
+<div id="workspace"></div>
 
 <script type="module">
 
 import { PROJECT } from "./shared/project.js";
-import { MSG } from "./shared/widget-api.js";
 
-/* =========================================================
+/* ================================
+   WIDGET CREATION
+================================ */
+
+function mountWidget(id, url, container) {
+
+  const frame = document.createElement("iframe");
+
+  frame.src = url;
+  frame.style.width = "100%";
+  frame.style.height = "100%";
+  frame.style.border = "none";
+
+  container.appendChild(frame);
+
+  return frame;
+}
+
+/* ================================
    ZONES
-========================================================= */
+================================ */
 
-const terrainZone =
-document.getElementById("terrainZone");
+const terrainZone = document.createElement("div");
+terrainZone.id = "terrain";
+terrainZone.className = "zone";
 
-const roadZone =
-document.getElementById("roadZone");
+const roadZone = document.createElement("div");
+roadZone.id = "road";
+roadZone.className = "zone";
 
-const featureZone =
-document.getElementById("featureZone");
+const featureZone = document.createElement("div");
+featureZone.id = "feature";
+featureZone.className = "zone";
 
-/* =========================================================
-   STATE
-========================================================= */
+const toolbox = document.getElementById("toolbox");
+const workspace = document.getElementById("workspace");
 
-const widgets = {
-    terrain:null,
-    road:null,
-    feature:null
+workspace.appendChild(terrainZone);
+workspace.appendChild(roadZone);
+workspace.appendChild(featureZone);
+
+/* ================================
+   MOUNT WIDGETS (LAZY)
+================================ */
+
+let widgets = {};
+
+function loadTerrain(){
+  if(!widgets.terrain)
+    widgets.terrain = mountWidget("terrain","widgets/terrain.html",terrainZone);
+}
+
+function loadRoad(){
+  if(!widgets.road)
+    widgets.road = mountWidget("road","widgets/road.html",roadZone);
+}
+
+function loadFeature(){
+  if(!widgets.feature)
+    widgets.feature = mountWidget("feature","widgets/feature.html",featureZone);
+}
+
+/* ================================
+   TOOLBOX UI
+================================ */
+
+toolbox.innerHTML = `
+
+<button id="genTerrain">Generate Terrain</button>
+<button id="genRoad">Generate Road</button>
+<button id="genFeature">Generate Feature</button>
+
+<hr/>
+
+<button id="exportTerrain">Export Terrain</button>
+<button id="exportRoad">Export Road</button>
+<button id="exportFeature">Export Feature</button>
+
+<button id="exportAll">Export All</button>
+
+`;
+
+/* ================================
+   GENERATE
+================================ */
+
+document.getElementById("genTerrain").onclick = () => {
+  loadTerrain();
+  widgets.terrain.contentWindow.postMessage({type:"GENERATE_TERRAIN"},"*");
 };
 
-/* =========================================================
-   LAUNCH SYSTEM
-========================================================= */
+document.getElementById("genRoad").onclick = () => {
+  loadRoad();
+  widgets.road.contentWindow.postMessage({type:"GENERATE_ROAD"},"*");
+};
 
-function launch(name,url,zone){
+document.getElementById("genFeature").onclick = () => {
+  loadFeature();
+  widgets.feature.contentWindow.postMessage({type:"GENERATE_FEATURE"},"*");
+};
 
-    if(widgets[name]) return;
+/* ================================
+   EXPORT
+================================ */
 
-    const frame =
-    document.createElement("iframe");
+document.getElementById("exportTerrain").onclick = () => {
+  loadTerrain();
+  widgets.terrain.contentWindow.postMessage({type:"EXPORT_TERRAIN"},"*");
+};
 
-    frame.src = url;
+document.getElementById("exportRoad").onclick = () => {
+  loadRoad();
+  widgets.road.contentWindow.postMessage({type:"EXPORT_ROAD"},"*");
+};
 
-    frame.onload = () => {
+document.getElementById("exportFeature").onclick = () => {
+  loadFeature();
+  widgets.feature.contentWindow.postMessage({type:"EXPORT_FEATURE"},"*");
+};
 
-        frame.contentWindow.postMessage({
+document.getElementById("exportAll").onclick = () => {
 
-            type:MSG.INIT,
+  loadTerrain();
+  loadRoad();
+  loadFeature();
 
-            payload:{
-                name,
-                project:PROJECT
-            }
+  widgets.terrain.contentWindow.postMessage({type:"EXPORT_TERRAIN"},"*");
+  widgets.road.contentWindow.postMessage({type:"EXPORT_ROAD"},"*");
+  widgets.feature.contentWindow.postMessage({type:"EXPORT_FEATURE"},"*");
 
-        },"*");
-
-    };
-
-    zone.innerHTML = "";
-    zone.appendChild(frame);
-
-    widgets[name] = frame;
-
-}
-
-/* =========================================================
-   BUTTONS
-========================================================= */
-
-btnTerrain.onclick = () =>
-launch("terrain","widgets/terrain.html",terrainZone);
-
-btnRoad.onclick = () =>
-launch("road","widgets/road.html",roadZone);
-
-btnFeature.onclick = () =>
-launch("feature","widgets/feature.html",featureZone);
-
-/* =========================================================
-   AUTO FIT SYSTEM (KEY ADDITION)
-========================================================= */
-
-function fitViewport(){
-
-    const frame =
-    document.getElementById("frame");
-
-    const scaleX =
-        window.innerWidth / frame.scrollWidth;
-
-    const scaleY =
-        window.innerHeight / frame.scrollHeight;
-
-    const scale =
-        Math.min(scaleX, scaleY) * 0.95;
-
-    frame.style.transform =
-        `scale(${scale})`;
-
-}
-
-window.addEventListener("resize",fitViewport);
-
-fitViewport();
-
-/* =========================================================
-   INIT
-========================================================= */
-
-console.log("WorldGenEditor viewport mode active", PROJECT);
+};
 
 </script>
 
