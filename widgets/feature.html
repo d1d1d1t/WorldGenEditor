@@ -1,31 +1,131 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Feature System</title>
+<title>Feature Generator</title>
 
 <style>
 
-html,body{
+html,
+body{
     margin:0;
     width:100%;
     height:100%;
     overflow:hidden;
     background:#111;
+    font-family:monospace;
 }
 
-#wrap{
+/*=========================================================
+  ROOT
+=========================================================*/
+
+#widget{
     width:100%;
     height:100%;
+
     display:flex;
-    justify-content:center;
+    flex-direction:column;
+}
+
+/*=========================================================
+  LOCAL TOOLBAR
+=========================================================*/
+
+#toolbar{
+
+    height:44px;
+
+    background:#1a1a1a;
+
+    border-bottom:1px solid #2b2b2b;
+
+    display:flex;
+
     align-items:center;
+
+    gap:10px;
+
+    padding:6px;
+
+    box-sizing:border-box;
+
+}
+
+button{
+
+    background:#222;
+
+    color:#ddd;
+
+    border:1px solid #444;
+
+    padding:4px 10px;
+
+    cursor:pointer;
+
+}
+
+button:hover{
+
+    background:#2f2f2f;
+
+}
+
+label{
+
+    color:#ccc;
+
+    font-size:12px;
+
+}
+
+input[type=range]{
+
+    width:120px;
+
+}
+
+#countValue{
+
+    width:18px;
+
+    display:inline-block;
+
+    text-align:center;
+
+}
+
+/*=========================================================
+  CANVAS AREA
+=========================================================*/
+
+#viewport{
+
+    flex:1;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    overflow:hidden;
+
+    background:#101010;
+
 }
 
 canvas{
-    width:100%;
-    height:100%;
+
     image-rendering:pixelated;
+
+    width:100%;
+
+    height:100%;
+
+    object-fit:contain;
+
 }
 
 </style>
@@ -33,172 +133,517 @@ canvas{
 
 <body>
 
-<div id="wrap">
-<canvas id="c" width="384" height="288"></canvas>
+<div id="widget">
+
+<div id="toolbar">
+
+<button id="generateBtn">
+Generate
+</button>
+
+<button id="exportBtn">
+Export
+</button>
+
+<label>
+
+<input
+id="linked"
+type="checkbox">
+
+Linked
+
+</label>
+
+<label>
+
+Features
+
+<input
+id="featureCount"
+type="range"
+min="1"
+max="5"
+value="3">
+
+<span id="countValue">
+3
+</span>
+
+</label>
+
+</div>
+
+<div id="viewport">
+
+<canvas
+id="canvas"
+width="768"
+height="576">
+</canvas>
+
+</div>
+
 </div>
 
 <script type="module">
 
-/* =========================================================
-   CANVAS
-========================================================= */
+/*=========================================================
+  CANVAS
+=========================================================*/
 
 const canvas =
-document.getElementById("c");
+document.getElementById("canvas");
 
 const ctx =
 canvas.getContext("2d");
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
+/*=========================================================
+  CONSTANTS
+=========================================================*/
 
-const W = 384;
-const H = 288;
+/* workspace */
 
-/* HARD SAFE MARGIN */
-const MARGIN = 65;
+const WIDTH = 768;
+const HEIGHT = 576;
 
-/* feature constraints */
-const MIN_F = 1;
-const MAX_F = 5;
+/* safe border */
 
-/* (f) size reference */
-const F_W = 384;
-const F_H = 288;
+const BORDER = 72;
 
-/* =========================================================
-   STATE
-========================================================= */
+/* one feature footprint */
+
+const F_WIDTH = 384;
+const F_HEIGHT = 288;
+
+/* eTile */
+
+const ETILE = 16;
+
+/* footprint resolution */
+
+const COLS = F_WIDTH / ETILE;
+const ROWS = F_HEIGHT / ETILE;
+
+/* grayscale values */
+
+const VALUES = [
+
+26,
+52,
+77,
+102,
+128,
+166,
+210,
+255
+
+];
+
+/*=========================================================
+  UI
+=========================================================*/
+
+const linkedBox =
+document.getElementById("linked");
+
+const slider =
+document.getElementById("featureCount");
+
+const countLabel =
+document.getElementById("countValue");
+
+slider.oninput = () =>
+countLabel.textContent = slider.value;
+
+/*=========================================================
+  DATA
+=========================================================*/
+
+let linked = false;
+
+let featureCount = 3;
+
+/*
+Every entry represents ONE (f)
+
+{
+    x,
+    y,
+    data[],
+    linked
+}
+*/
 
 let features = [];
 
-/* =========================================================
-   SAFE POSITIONING
-========================================================= */
+linkedBox.onchange = () => {
 
-function safeX(){
+    linked =
+    linkedBox.checked;
 
-    return Math.floor(
-        MARGIN +
-        Math.random() *
-        (W - MARGIN * 2)
-    );
+};
+
+slider.oninput = () => {
+
+    featureCount =
+    Number(slider.value);
+
+    countLabel.textContent =
+    featureCount;
+
+};
+
+/*=========================================================
+  PART 2 CONTINUES HERE...
+=========================================================*/
+
+/*=========================================================
+  BUILD ONE (f)
+=========================================================*/
+
+function randomValue(){
+
+    return VALUES[
+        Math.floor(
+            Math.random()*VALUES.length
+        )
+    ];
 
 }
 
-function safeY(){
-
-    return Math.floor(
-        MARGIN +
-        Math.random() *
-        (H - MARGIN * 2)
-    );
-
-}
-
-/* =========================================================
-   (F) GENERATION (384×288 footprint)
-========================================================= */
+/*=========================================================
+  STRUCTURAL (f) GENERATOR
+=========================================================*/
 
 function buildF(){
 
-    const data = [];
+    const COLS = Math.floor(F_WIDTH / ETILE);
+    const ROWS = Math.floor(F_HEIGHT / ETILE);
 
-    const cols = Math.floor(F_W / 16);
-    const rows = Math.floor(F_H / 16);
+    const total = COLS * ROWS;
 
-    for(let y=0;y<rows;y++){
+    /* occupancy target (controls density) */
+    const targetDensity = 0.22 + Math.random() * 0.18;
 
-        for(let x=0;x<cols;x++){
+    const targetCount = Math.floor(total * targetDensity);
 
-            data.push(Math.random() > 0.75 ? 1 : 0);
+    /* grid occupancy map */
+    const grid = new Array(COLS * ROWS).fill(0);
+
+    /* seed start near center */
+    let startX = Math.floor(COLS / 2);
+    let startY = Math.floor(ROWS / 2);
+
+    function idx(x,y){
+        return y * COLS + x;
+    }
+
+    function inBounds(x,y){
+        return x>=0 && y>=0 && x<COLS && y<ROWS;
+    }
+
+    function neighbors(x,y){
+        return [
+            [x+1,y],
+            [x-1,y],
+            [x,y+1],
+            [x,y-1]
+        ];
+    }
+
+    /* start seed */
+    let frontier = [[startX,startY]];
+    grid[idx(startX,startY)] = 1;
+
+    let count = 1;
+
+    /* growth-based cluster (NOT noise field) */
+    while(frontier.length && count < targetCount){
+
+        const i = Math.floor(Math.random() * frontier.length);
+        const [x,y] = frontier[i];
+
+        const n = neighbors(x,y);
+
+        for(const [nx,ny] of n){
+
+            if(!inBounds(nx,ny)) continue;
+
+            const id = idx(nx,ny);
+
+            if(grid[id] === 0 && Math.random() > 0.35){
+
+                grid[id] = 1;
+                frontier.push([nx,ny]);
+                count++;
+
+                if(count >= targetCount) break;
+            }
+        }
+
+        /* prune frontier randomly */
+        if(Math.random() > 0.7){
+            frontier.splice(i,1);
+        }
+    }
+
+    /* assign values AFTER structure exists */
+    const data = grid.map(v => {
+
+        if(v === 0) return 0;
+
+        return VALUES[
+            Math.floor(Math.random() * VALUES.length)
+        ];
+
+    });
+
+    return {
+        cols: COLS,
+        rows: ROWS,
+        data
+    };
+}
+
+/*=========================================================
+  COLLISION
+=========================================================*/
+
+function overlaps(x,y){
+
+    for(const f of features){
+
+        if(
+
+            x < f.x + F_WIDTH + ETILE &&
+            x + F_WIDTH + ETILE > f.x &&
+
+            y < f.y + F_HEIGHT + ETILE &&
+            y + F_HEIGHT + ETILE > f.y
+
+        ){
+
+            return true;
 
         }
 
     }
 
-    return {
-        data,
-        cols,
-        rows
+    return false;
+
+}
+
+/*=========================================================
+  RANDOM POSITION
+=========================================================*/
+
+function randomPosition(){
+
+    return{
+
+        x:
+        BORDER +
+
+        Math.floor(
+
+            Math.random()*
+
+            (WIDTH-F_WIDTH-BORDER*2)
+
+        ),
+
+        y:
+        BORDER +
+
+        Math.floor(
+
+            Math.random()*
+
+            (HEIGHT-F_HEIGHT-BORDER*2)
+
+        )
+
     };
 
 }
 
-/* =========================================================
-   FEATURE SET (1–5 F BLOCKS)
-========================================================= */
+/*=========================================================
+  LINKED POSITION
+=========================================================*/
 
-function generate(){
+function linkedPosition(parent){
 
-    features = [];
+    /*
+       offsets are deliberately
+       smaller than footprint
+       allowing clusters
+    */
 
-    const count =
-        Math.floor(Math.random() * MAX_F) + MIN_F;
+    const choices=[
 
-    const baseX = safeX();
-    const baseY = safeY();
+        [192,0],
+        [-192,0],
 
-    for(let i=0;i<count;i++){
+        [0,144],
+        [0,-144],
 
-        /* horizontal linking offset */
-        const offsetX =
-            i * (F_W - 40); // slight overlap allowance for linking
+        [192,144],
+        [-192,-144],
 
-        features.push({
+        [192,-144],
+        [-192,144]
 
-            x: baseX + offsetX,
+    ];
 
-            y: baseY,
+    const c=
 
-            f: buildF()
+        choices[
+            Math.floor(
+                Math.random()*choices.length
+            )
+        ];
 
-        });
+    let x=
 
-    }
+        parent.x+c[0];
+
+    let y=
+
+        parent.y+c[1];
+
+    x=Math.max(
+
+        BORDER,
+
+        Math.min(
+
+            WIDTH-F_WIDTH-BORDER,
+
+            x
+
+        )
+
+    );
+
+    y=Math.max(
+
+        BORDER,
+
+        Math.min(
+
+            HEIGHT-F_HEIGHT-BORDER,
+
+            y
+
+        )
+
+    );
+
+    return{
+
+        x,
+
+        y
+
+    };
 
 }
 
-/* =========================================================
-   RENDER
-========================================================= */
+/*=========================================================
+  PLACE FEATURE
+=========================================================*/
 
-function render(){
+function placeFeature(){
 
-    ctx.clearRect(0,0,W,H);
+    /*
+      FIRST FEATURE
+    */
 
-    for(const fset of features){
+    if(features.length===0){
 
-        const f = fset.f;
+        const p=randomPosition();
 
-        for(let i=0;i<f.data.length;i++){
+        features.push({
 
-            if(!f.data[i]) continue;
+            x:p.x,
 
-            const x = i % f.cols;
-            const y = Math.floor(i / f.cols);
+            y:p.y,
 
-            const px =
-                fset.x + x * 16;
+            data:buildF()
 
-            const py =
-                fset.y + y * 16;
+        });
 
-            /* HARD BOUNDARY CHECK */
+        return;
 
-            if(
-                px < MARGIN ||
-                py < MARGIN ||
-                px > W - MARGIN ||
-                py > H - MARGIN
-            ){
-                continue;
+    }
+
+    /*
+      LINKED MODE
+    */
+
+    if(linked){
+
+        let attempts=50;
+
+        while(attempts--){
+
+            const parent=
+
+                features[
+                    Math.floor(
+                        Math.random()*
+                        features.length
+                    )
+                ];
+
+            const p=
+
+                linkedPosition(parent);
+
+            if(!overlaps(p.x,p.y)){
+
+                features.push({
+
+                    x:p.x,
+
+                    y:p.y,
+
+                    data:buildF()
+
+                });
+
+                return;
+
             }
 
-            ctx.fillStyle = "#ccc";
+        }
 
-            ctx.fillRect(px,py,16,16);
+    }
+
+    /*
+      UNLINKED MODE
+    */
+
+    let attempts=100;
+
+    while(attempts--){
+
+        const p=randomPosition();
+
+        if(!overlaps(p.x,p.y)){
+
+            features.push({
+
+                x:p.x,
+
+                y:p.y,
+
+                data:buildF()
+
+            });
+
+            return;
 
         }
 
@@ -206,65 +651,175 @@ function render(){
 
 }
 
-/* =========================================================
-   ZOOM SUPPORT (VIEW ONLY)
-========================================================= */
+/*=========================================================
+  GENERATE
+=========================================================*/
 
-let zoom = 1;
+function generate(){
 
-function setZoom(z){
+    features=[];
 
-    zoom = z;
+    for(
 
-    canvas.style.transform =
-        `scale(${zoom})`;
+        let i=0;
+
+        i<featureCount;
+
+        i++
+
+    ){
+
+        placeFeature();
+
+    }
 
 }
 
-window.setFeatureZoom = setZoom;
+/*=========================================================
+  RENDER
+=========================================================*/
 
-/* =========================================================
-   MESSAGES
-========================================================= */
+function render(){
+
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,WIDTH,HEIGHT);
+
+    for(const feature of features){
+
+        const f=feature.data;
+
+        for(let i=0;i<f.data.length;i++){
+
+            const value=f.data[i];
+
+            if(value===0) continue;
+
+            const ex=i%f.cols;
+            const ey=Math.floor(i/f.cols);
+
+            const px=feature.x+ex*ETILE;
+            const py=feature.y+ey*ETILE;
+
+            /* keep inside protected border */
+
+            if(
+                px < BORDER ||
+                py < BORDER ||
+                px + ETILE > WIDTH - BORDER ||
+                py + ETILE > HEIGHT - BORDER
+            ){
+                continue;
+            }
+
+            ctx.fillStyle=`rgb(${value},${value},${value})`;
+
+            ctx.fillRect(
+                px,
+                py,
+                ETILE,
+                ETILE
+            );
+
+        }
+
+    }
+
+}
+
+/*=========================================================
+  EXPORT
+=========================================================*/
+
+function exportFeature(){
+
+    const link=document.createElement("a");
+
+    link.download="feature_768x576.png";
+
+    link.href=
+        canvas.toDataURL("image/png");
+
+    link.click();
+
+}
+
+/*=========================================================
+  GENERATE + RENDER
+=========================================================*/
+
+function regenerate(){
+
+    generate();
+    render();
+
+}
+
+/*=========================================================
+  UI
+=========================================================*/
+
+document
+.getElementById("generateBtn")
+.onclick=regenerate;
+
+document
+.getElementById("exportBtn")
+.onclick=exportFeature;
+
+/*=========================================================
+  HUB MESSAGES
+=========================================================*/
 
 window.addEventListener("message",(e)=>{
 
-    const msg = e.data;
+    const msg=e.data;
 
     if(!msg) return;
 
     switch(msg.type){
 
         case "INIT":
-            generate();
-            render();
+
+            regenerate();
             break;
 
-        case "REGENERATE_FEATURES":
-            generate();
-            render();
+        case "GENERATE":
+
+            regenerate();
             break;
 
-case "GENERATE":
-  generate();
-  render();
-  break;
+        case "EXPORT":
 
-case "EXPORT":
-  exportFeature();
-  break;
+            exportFeature();
+            break;
 
         case "FEATURE_ZOOM":
-            setZoom(msg.payload.zoom);
+
+            if(msg.payload?.zoom){
+
+                canvas.style.transform=
+                    `scale(${msg.payload.zoom})`;
+
+            }
+
             break;
 
     }
 
 });
 
-console.log("Feature system updated (1–5 bounded F blocks)");
+/*=========================================================
+  INITIALIZE
+=========================================================*/
 
-</script>
+featureCount=
+Number(slider.value);
 
-</body>
-</html>
+linked=
+linkedBox.checked;
+
+regenerate();
+
+console.log(
+    "Feature Generator Ready"
+);
