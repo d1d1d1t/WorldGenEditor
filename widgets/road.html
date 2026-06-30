@@ -2,28 +2,68 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Road Generator</title>
+<title>Road (Coupled)</title>
 
 <style>
 
-html,body{
-    margin:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#111;
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  font-family: monospace;
 }
 
-#wrap{
-    width:100%;
-    height:100%;
-    display:flex;
+#widget {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-canvas{
-    width:100%;
-    height:100%;
-    image-rendering:pixelated;
+/* =========================
+   TOOLBAR
+========================= */
+
+#toolbar {
+  height: 42px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #222;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+}
+
+button {
+  background: #222;
+  color: #ccc;
+  border: 1px solid #333;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* =========================
+   CANVAS
+========================= */
+
+#wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+canvas {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+  display: block;
 }
 
 </style>
@@ -31,206 +71,175 @@ canvas{
 
 <body>
 
-<div id="wrap">
-<canvas id="c" width="192" height="1920"></canvas>
+<div id="widget">
+
+  <div id="toolbar">
+    <button id="regen">Generate Road</button>
+    <button id="invert">Invert: OFF</button>
+  </div>
+
+  <div id="wrap">
+    <canvas id="c" width="1920" height="1920"></canvas>
+  </div>
+
 </div>
 
 <script type="module">
 
-/* =========================================================
+/* =========================
    CANVAS
-========================================================= */
+========================= */
 
-const canvas =
-document.getElementById("c");
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
 
-const ctx =
-canvas.getContext("2d");
+const SIZE = 1920;
 
-/* =========================================================
-   CONFIG
-========================================================= */
+/* =========================
+   GRID (MATCH TERRAIN)
+========================= */
 
-const config = {
+const MTILE = 64;
+const GRID = 30;
 
-    cord:0.75,     // road tightness to terrain
-
-    invert:false,  // flip influence
-
-    tileW:48,
-
-    tileH:32
-
-};
-
-/* =========================================================
+/* =========================
    STATE
-========================================================= */
+========================= */
 
-let edgeProfile = null;
+let inverted = false;
 
-let spine = [];
+/* terrain input grid */
+let terrain = Array.from({length:GRID}, () =>
+  Array(GRID).fill(128)
+);
 
-/* =========================================================
-   MESSAGE IN
-========================================================= */
+/* =========================
+   TERRAIN SAMPLING
+========================= */
 
-window.addEventListener("message", (e)=>{
+function t(x,y){
+  return (terrain[y]?.[x] ?? 128) / 255;
+}
 
-    const msg = e.data;
-
-    if(!msg) return;
-
-    if(msg.type === "ROAD_EDGE_PROFILE"){
-
-        edgeProfile = msg.payload;
-
-        generateRoad();
-
-    }
-
-});
-
-/* =========================================================
-   CORE ROAD GENERATION
-========================================================= */
+/* =========================
+   ROAD FIELD MODEL
+========================= */
 
 function generateRoad(){
 
-    if(!edgeProfile) return;
+  if(!terrain.length) return; // IMPORTANT FIX
 
-    const right = edgeProfile.right;
+  ctx.clearRect(0,0,SIZE,SIZE);
 
-    const rows = Math.floor(canvas.height / config.tileH);
+  let cx = Math.floor(GRID / 2);
 
-    const cols = Math.floor(canvas.width / config.tileW);
+  for(let y = 0; y < GRID; y++){
 
-    spine = [];
+    /* =========================
+       TERRAIN-AWARE STEERING
+    ========================= */
 
-    const centerBase = Math.floor(cols / 2);
+    const left  = t(cx-1,y);
+    const mid   = t(cx,y);
+    const right = t(cx+1,y);
 
-    for(let y=0;y<rows;y++){
+    // prefer LOW terrain density
+    if(left < mid && left < right) cx--;
+    else if(right < mid && right < left) cx++;
 
-        /* -----------------------------------------
-           SAMPLE TERRAIN INFLUENCE
-        ------------------------------------------ */
+    cx = Math.max(0, Math.min(GRID-1, cx));
 
-        const raw =
-            right[y % right.length];
+    /* =========================
+       RENDER ROW
+    ========================= */
 
-        let influence =
-            raw / 255;
+    for(let x = 0; x < GRID; x++){
 
-        if(config.invert){
+      const dist = Math.abs(x - cx);
 
-            influence =
-                1 - influence;
+      /* cord falloff */
+      let intensity = Math.exp(-(dist*dist)/2);
 
-        }
+      /* invert toggle */
+      if(inverted) intensity = 1 - intensity;
 
-        /* -----------------------------------------
-           CORD SYSTEM (attraction strength)
-        ------------------------------------------ */
+      /* terrain coupling influence */
+      const terrainFactor = 1 - t(x,y) * 0.35;
 
-        const offset =
-            (influence - 0.5)
-            * config.cord
-            * cols;
+      intensity *= terrainFactor;
 
-        let x =
-            Math.round(centerBase + offset);
+      const v = Math.floor(intensity * 255);
 
-        x = Math.max(0, Math.min(cols-1, x));
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
 
-        spine.push(x);
-
-    }
-
-    render();
-
-}
-
-/* =========================================================
-   RENDER ROAD
-========================================================= */
-
-function render(){
-
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    const rows =
-        spine.length;
-
-    const cols =
-        Math.floor(canvas.width / config.tileW);
-
-    for(let y=0;y<rows;y++){
-
-        const center =
-            spine[y];
-
-        for(let x=0;x<cols;x++){
-
-            const dist =
-                Math.abs(x-center);
-
-            let v;
-
-            /* -------------------------------------
-               ROAD FALLOFF MODEL
-            -------------------------------------- */
-
-            if(dist===0) v=0.95;
-            else if(dist===1) v=0.70;
-            else if(dist===2) v=0.45;
-            else v=0.20;
-
-            const c =
-                Math.floor(v*255);
-
-            ctx.fillStyle =
-                `rgb(${c},${c},${c})`;
-
-            ctx.fillRect(
-
-                x*config.tileW,
-                y*config.tileH,
-                config.tileW,
-                config.tileH
-
-            );
-
-        }
+      ctx.fillRect(
+        x * MTILE,
+        y * MTILE,
+        MTILE,
+        MTILE
+      );
 
     }
 
+  }
+
 }
 
-/* =========================================================
-   OPTIONAL CONTROLS (DEBUG)
-========================================================= */
+/* =========================
+   TOGGLE
+========================= */
 
-window.setRoadCord = (v)=>{
+document.getElementById("invert").onclick = () => {
 
-    config.cord = v;
+  inverted = !inverted;
 
-    generateRoad();
+  document.getElementById("invert").textContent =
+    inverted ? "Invert: ON" : "Invert: OFF";
 
-};
-
-window.setRoadInvert = (v)=>{
-
-    config.invert = v;
-
-    generateRoad();
+  generateRoad();
 
 };
 
-/* =========================================================
-   INIT (EMPTY UNTIL TERRAIN ARRIVES)
-========================================================= */
+/* =========================
+   HUB INPUT
+========================= */
 
-console.log("Road widget ready");
+window.addEventListener("message", (e) => {
+
+  const msg = e.data;
+  if (!msg) return;
+
+  switch (msg.type) {
+
+    case "SET_TERRAIN":
+
+      if (msg.payload?.grid) {
+        terrain = msg.payload.grid;
+        generateRoad(); // regenerate ONLY on valid data
+      }
+
+      break;
+
+    case "GENERATE":
+      // regenerate using last known terrain snapshot
+      generateRoad();
+      break;
+
+    case "EXPORT":
+      const link = document.createElement("a");
+      link.download = "road_1920.jpg";
+      link.href = canvas.toDataURL("image/jpeg", 1.0);
+      link.click();
+      break;
+  }
+
+});
+
+/* =========================
+   INIT
+========================= */
+
+generateRoad();
 
 </script>
 

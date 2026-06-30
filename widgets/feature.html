@@ -245,6 +245,15 @@ window.addEventListener("message",(e)=>{
             render();
             break;
 
+case "GENERATE":
+  generate();
+  render();
+  break;
+
+case "EXPORT":
+  exportFeature();
+  break;
+
         case "FEATURE_ZOOM":
             setZoom(msg.payload.zoom);
             break;

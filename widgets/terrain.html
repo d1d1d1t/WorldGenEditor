@@ -1,39 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Terrain (t) Generator</title>
+<title>Terrain Widget</title>
 
 <style>
 
-html,
-body{
-    margin:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#111;
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  font-family: monospace;
 }
 
-#wrap{
-    width:100%;
-    height:100%;
-    display:flex;
-    justify-content:center;
-    align-items:center;
+/* =========================
+   ROOT LAYOUT
+========================= */
+
+#widget {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-canvas{
+/* =========================
+   LOCAL TOOLBAR
+========================= */
 
-    width:100%;
-    height:100%;
+#toolbar {
+  height: 42px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #222;
 
-    aspect-ratio:1/1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+}
 
-    display:block;
+button {
+  background: #222;
+  color: #ccc;
+  border: 1px solid #333;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 12px;
+}
 
-    image-rendering:pixelated;
+/* =========================
+   CANVAS CONTAINER (NO CROPPING)
+========================= */
 
+#canvasWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* IMPORTANT: visual scaling only */
+canvas {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
 }
 
 </style>
@@ -41,302 +77,216 @@ canvas{
 
 <body>
 
-<div id="wrap">
-<canvas id="terrainCanvas"
-        width="1920"
-        height="1920"></canvas>
+<div id="widget">
+
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <button id="genT">Generate (t)</button>
+    <button id="genM">Generate (mTile)</button>
+    <button id="exportBtn">Export</button>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvasWrap">
+    <canvas id="c" width="1920" height="1920"></canvas>
+  </div>
+
 </div>
 
 <script type="module">
 
-/* ==========================================================
-    TERRAIN CONSTANTS
-========================================================== */
+/* =========================
+   CANVAS SETUP
+========================= */
 
-const GRID_SIZE = 10;
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
 
-const TILE_SIZE = 192;
+const SIZE = 1920;
 
-const EXPORT_SIZE = 1920;
+/* =========================
+   SYSTEM CONSTANTS
+========================= */
 
-const HEIGHT_VALUES = [
+// (t) tiles
+const T_SIZE = 192;
+const T_GRID = 10;
 
-    255,
-    191,
-    128,
-    64,
-    26
+// mTiles
+const MTILE_SIZE = 64;
+const M_GRID = 30;
 
-];
+/* =========================
+   VALUE SET
+========================= */
 
-/* ==========================================================
-    CANVAS
-========================================================== */
+const VALUES = [255, 191, 128, 64, 26];
 
-const canvas =
-    document.getElementById("terrainCanvas");
+/* =========================
+   DATA GRIDS
+========================= */
 
-const ctx =
-    canvas.getContext("2d");
+let tGrid = Array.from({ length: T_GRID }, () =>
+  Array(T_GRID).fill(128)
+);
 
-/* ==========================================================
-    TERRAIN OBJECT
-========================================================== */
+let mGrid = Array.from({ length: M_GRID }, () =>
+  Array(M_GRID).fill(128)
+);
 
-const terrain = {
+/* =========================
+   GENERATE PER (t)
+========================= */
 
-    grid:[],
+function generateT(){
 
-    edgeProfiles:{
+  for (let y = 0; y < T_GRID; y++) {
+    for (let x = 0; x < T_GRID; x++) {
 
-        top:[],
-
-        bottom:[],
-
-        left:[],
-
-        right:[]
-
-    }
-
-};
-
-/* ==========================================================
-    RANDOM HEIGHT
-========================================================== */
-
-function randomHeight(){
-
-    return HEIGHT_VALUES[
-        Math.floor(
-            Math.random()*HEIGHT_VALUES.length
-        )
-    ];
-
-}
-
-/* ==========================================================
-    BUILD GRID
-========================================================== */
-
-function buildGrid(){
-
-    terrain.grid =
-        Array.from(
-
-            {length:GRID_SIZE},
-
-            ()=>Array(GRID_SIZE).fill(0)
-
-        );
-
-    let whiteCount=0;
-
-    for(let y=0;y<GRID_SIZE;y++){
-
-        for(let x=0;x<GRID_SIZE;x++){
-
-            let v=randomHeight();
-
-            if(v===255 && whiteCount>=4){
-
-                v=128;
-
-            }
-
-            terrain.grid[y][x]=v;
-
-            if(v===255){
-
-                whiteCount++;
-
-            }
-
-        }
+      tGrid[y][x] =
+        VALUES[Math.floor(Math.random() * VALUES.length)];
 
     }
+  }
 
-    terrain.grid[5][5]=255;
-
-}
-
-/* ==========================================================
-    BUILD EDGE PROFILES
-========================================================== */
-
-function buildEdgeProfiles(){
-
-    terrain.edgeProfiles.top =
-        [...terrain.grid[0]];
-
-    terrain.edgeProfiles.bottom =
-        [...terrain.grid[GRID_SIZE-1]];
-
-    terrain.edgeProfiles.left =
-        terrain.grid.map(r=>r[0]);
-
-    terrain.edgeProfiles.right =
-        terrain.grid.map(r=>r[GRID_SIZE-1]);
+  renderT();
 
 }
 
-/* ==========================================================
-    DRAW TERRAIN
-========================================================== */
+/* =========================
+   RENDER (t)
+========================= */
 
-function drawTerrain(){
+function renderT(){
 
-    ctx.clearRect(
+  ctx.clearRect(0,0,SIZE,SIZE);
 
-        0,
-        0,
-        EXPORT_SIZE,
-        EXPORT_SIZE
+  for (let y = 0; y < T_GRID; y++) {
+    for (let x = 0; x < T_GRID; x++) {
 
-    );
+      const v = tGrid[y][x];
 
-    for(let y=0;y<GRID_SIZE;y++){
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
 
-        for(let x=0;x<GRID_SIZE;x++){
-
-            const v=
-                terrain.grid[y][x];
-
-            ctx.fillStyle=
-                `rgb(${v},${v},${v})`;
-
-            ctx.fillRect(
-
-                x*TILE_SIZE,
-
-                y*TILE_SIZE,
-
-                TILE_SIZE,
-
-                TILE_SIZE
-
-            );
-
-        }
+      ctx.fillRect(
+        x * T_SIZE,
+        y * T_SIZE,
+        T_SIZE,
+        T_SIZE
+      );
 
     }
+  }
 
 }
 
-/* ==========================================================
-    EXPORT
-========================================================== */
+/* =========================
+   GENERATE PER mTile
+========================= */
+
+function generateM(){
+
+  for (let y = 0; y < M_GRID; y++) {
+    for (let x = 0; x < M_GRID; x++) {
+
+      mGrid[y][x] =
+        VALUES[Math.floor(Math.random() * VALUES.length)];
+
+    }
+  }
+
+  renderM();
+
+}
+
+/* =========================
+   RENDER mTile
+========================= */
+
+function renderM(){
+
+  ctx.clearRect(0,0,SIZE,SIZE);
+
+  for (let y = 0; y < M_GRID; y++) {
+    for (let x = 0; x < M_GRID; x++) {
+
+      const v = mGrid[y][x];
+
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+
+      ctx.fillRect(
+        x * MTILE_SIZE,
+        y * MTILE_SIZE,
+        MTILE_SIZE,
+        MTILE_SIZE
+      );
+
+    }
+  }
+
+}
+
+/* =========================
+   EXPORT (ALWAYS 1920×1920)
+========================= */
 
 function exportTerrain(){
 
-    const link=
-        document.createElement("a");
+  const link = document.createElement("a");
 
-    link.download="terrain_1920.jpg";
+  link.download = "terrain_1920.jpg";
+  link.href = canvas.toDataURL("image/jpeg", 1.0);
 
-    link.href=
-        canvas.toDataURL(
-
-            "image/jpeg",
-
-            1.0
-
-        );
-
-    link.click();
+  link.click();
 
 }
 
-/* ==========================================================
-    SEND EDGE PROFILE
-========================================================== */
+/* =========================
+   UI HOOKS
+========================= */
 
-function notifyHub(){
+document.getElementById("genT").onclick = () => {
+  generateT();
+  publishTerrain();
+};
 
-    window.parent.postMessage({
+document.getElementById("genM").onclick = () => {
+  generateM();
+  publishTerrain();
+};
 
-        type:"TERRAIN_EDGE_PROFILE",
+document.getElementById("exportBtn").onclick = exportTerrain;
 
-        payload:{
+/* =========================
+   HUB MESSAGING
+========================= */
 
-            top:
-                terrain.edgeProfiles.top,
+let terrainGrid = null;
 
-            bottom:
-                terrain.edgeProfiles.bottom,
+window.addEventListener("message", (e) => {
 
-            left:
-                terrain.edgeProfiles.left,
+  const msg = e.data;
+  if(!msg) return;
 
-            right:
-                terrain.edgeProfiles.right
+  if(msg.type === "TERRAIN_DATA"){
+    terrainGrid = msg.payload.grid;
+  }
 
-        }
+});
 
-    },"*");
+/* =========================
+   INIT
+========================= */
 
+generateT();
+generateM();
+
+function publishTerrain(){
+  window.parent.postMessage({
+    type: "TERRAIN_DATA",
+    payload: { grid: mGrid }
+  }, "*");
 }
-
-/* ==========================================================
-    GENERATE
-========================================================== */
-
-function generateTerrain(){
-
-    buildGrid();
-
-    buildEdgeProfiles();
-
-    drawTerrain();
-
-    notifyHub();
-
-}
-
-/* ==========================================================
-    HUB MESSAGES
-========================================================== */
-
-window.addEventListener(
-
-    "message",
-
-    e=>{
-
-        const msg=e.data;
-
-        if(!msg)return;
-
-        switch(msg.type){
-
-            case "EXPORT_TERRAIN":
-
-                exportTerrain();
-
-                break;
-
-            case "REGENERATE_TERRAIN":
-
-                generateTerrain();
-
-                break;
-
-        }
-
-    }
-
-);
-
-/* ==========================================================
-    INITIALIZE
-========================================================== */
-
-generateTerrain();
-
-console.log(
-    "Terrain widget ready."
-);
-
 </script>
 
 </body>
