@@ -1,28 +1,66 @@
 /*
  * data/tile-spec.js
- * WorldGenEditor
  *
- * Canonical tile and canvas definitions.
- * This file contains immutable project geometry.
+ * Canonical WorldGenEditor geometry.
+ *
+ * This is the ONLY source of truth for world dimensions.
  */
 
 export const TILE_SPEC = Object.freeze({
 
-    micro: Object.freeze({
+    world: Object.freeze({
+        width: 1920,
+        height: 1920
+    }),
 
-        terrain: Object.freeze({
+    terrain: Object.freeze({
+
+        macro: Object.freeze({
+            name: "tTile",
+            width: 192,
+            height: 192
+        }),
+
+        micro: Object.freeze({
             name: "mTile",
             width: 64,
             height: 64
         }),
 
-        road: Object.freeze({
+        grid: Object.freeze({
+            macroX: 10,
+            macroY: 10,
+            microX: 30,
+            microY: 30
+        })
+
+    }),
+
+    road: Object.freeze({
+
+        macro: Object.freeze({
+            name: "pTile",
+            width: 96,
+            height: 64
+        }),
+
+        micro: Object.freeze({
             name: "rTile",
             width: 48,
             height: 32
+        })
+
+    }),
+
+    feature: Object.freeze({
+
+        macro: Object.freeze({
+            name: "fTile",
+            width: 384,
+            height: 288
         }),
 
-        feature: Object.freeze({
+        micro: Object.freeze({
             name: "eTile",
             width: 16,
             height: 16
@@ -30,63 +68,12 @@ export const TILE_SPEC = Object.freeze({
 
     }),
 
-    macro: Object.freeze({
+    overpass: Object.freeze({
 
-        terrain: Object.freeze({
-            name: "tTile",
-            width: 192,
-            height: 192
-        }),
+        name: "overpass",
 
-        road: Object.freeze({
-            name: "pTile",
-            width: 96,
-            height: 64
-        }),
-
-        feature: Object.freeze({
-            name: "fTile",
-            width: 384,
-            height: 288
-        })
-
-    }),
-
-    canvas: Object.freeze({
-
-        terrain: Object.freeze({
-            width: 1920,
-            height: 1920
-        }),
-
-        road: Object.freeze({
-            width: 192,
-            height: 1920
-        }),
-
-        feature: Object.freeze({
-            width: 384,
-            height: 288
-        })
-
-    }),
-
-    domains: Object.freeze({
-
-        terrain: Object.freeze({
-            micro: "mTile",
-            macro: "tTile"
-        }),
-
-        road: Object.freeze({
-            micro: "rTile",
-            macro: "pTile"
-        }),
-
-        feature: Object.freeze({
-            micro: "eTile",
-            macro: "fTile"
-        })
+        width: 1920,
+        height: 1920
 
     })
 
