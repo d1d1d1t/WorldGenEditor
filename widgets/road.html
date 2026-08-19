@@ -1,69 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Road (Coupled)</title>
+<title>Road Generator</title>
 
 <style>
 
-html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #111;
-  font-family: monospace;
+html,
+body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#111;
+    font-family:monospace;
 }
 
-#widget {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+#widget{
+    width:100%;
+    height:100%;
+    display:flex;
+    flex-direction:column;
 }
 
-/* =========================
-   TOOLBAR
-========================= */
+#toolbar{
 
-#toolbar {
-  height: 42px;
-  background: #1a1a1a;
-  border-bottom: 1px solid #222;
+    height:44px;
 
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
+    background:#1a1a1a;
+
+    border-bottom:1px solid #2b2b2b;
+
+    display:flex;
+    align-items:center;
+    gap:8px;
+
+    padding:6px;
+
+    box-sizing:border-box;
 }
 
-button {
-  background: #222;
-  color: #ccc;
-  border: 1px solid #333;
-  cursor: pointer;
-  padding: 4px 8px;
+button{
+
+    background:#222;
+    color:#ccc;
+
+    border:1px solid #444;
+
+    padding:4px 10px;
+
+    cursor:pointer;
+
+    font-family:monospace;
 }
 
-/* =========================
-   CANVAS
-========================= */
-
-#wrap {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+button:hover{
+    background:#2f2f2f;
 }
 
-canvas {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  image-rendering: pixelated;
-  display: block;
+#status{
+
+    margin-left:auto;
+
+    color:#777;
+
+    font-size:11px;
+
+    white-space:nowrap;
+}
+
+#viewport{
+
+    flex:1;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    overflow:auto;
+
+    background:#101010;
+}
+
+canvas{
+
+    display:block;
+
+    image-rendering:pixelated;
+
 }
 
 </style>
@@ -73,186 +99,1102 @@ canvas {
 
 <div id="widget">
 
-  <div id="toolbar">
-    <button id="regen">Generate Road</button>
-    <button id="invert">Invert: OFF</button>
-    <button id="export">Export Road</button>
-  </div>
+    <div id="toolbar">
 
-  <div id="wrap">
-    <canvas id="c" width="1920" height="1920"></canvas>
-  </div>
+        <button id="generateBtn">
+            Generate Road
+        </button>
+
+        <button id="invertBtn">
+            Invert: OFF
+        </button>
+
+        <button id="exportBtn">
+            Export Road
+        </button>
+
+        <span id="status">
+            rTile 64×32 | p 320×192 | 4p×18p | 1280×3456
+        </span>
+
+    </div>
+
+    <div id="viewport">
+
+        <canvas
+            id="canvas"
+            width="1280"
+            height="3456">
+        </canvas>
+
+    </div>
 
 </div>
 
+
 <script type="module">
 
-/* =========================
-   CANVAS
-========================= */
+/*=========================================================
+  CANVAS
+=========================================================*/
 
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
+const canvas =
+    document.getElementById("canvas");
 
-const SIZE = 1920;
+const ctx =
+    canvas.getContext("2d");
 
-/* =========================
-   GRID (MATCH TERRAIN)
-========================= */
 
-const MTILE = 64;
-const GRID = 30;
+/*=========================================================
+  CANONICAL METRICS
+=========================================================*/
 
-/* =========================
-   STATE
-========================= */
+/*
+    -------------------------------------------------------
+    rTile
+    -------------------------------------------------------
+
+    One rTile is:
+
+        64 × 32
+*/
+
+const RTILE_WIDTH  = 64;
+const RTILE_HEIGHT = 32;
+
+
+/*
+    -------------------------------------------------------
+    p
+    -------------------------------------------------------
+
+    p contains exactly 30 rTiles:
+
+        5 × 6 = 30
+*/
+
+const P_WIDTH  = 320;
+const P_HEIGHT = 192;
+
+const P_RTILES_X = 5;
+const P_RTILES_Y = 6;
+
+
+/*
+    Sanity check.
+*/
+
+if(
+    P_RTILES_X * RTILE_WIDTH !== P_WIDTH ||
+    P_RTILES_Y * RTILE_HEIGHT !== P_HEIGHT
+){
+    throw new Error(
+        "Invalid p / rTile relationship."
+    );
+}
+
+
+/*
+    -------------------------------------------------------
+    FULL ROAD
+    -------------------------------------------------------
+
+        4p × 18p
+
+    Native dimensions:
+
+        20 rTiles × 108 rTiles
+*/
+
+const ROAD_P_WIDTH  = 4;
+const ROAD_P_HEIGHT = 18;
+
+const ROAD_RTILES_X =
+    P_RTILES_X *
+    ROAD_P_WIDTH;
+
+const ROAD_RTILES_Y =
+    P_RTILES_Y *
+    ROAD_P_HEIGHT;
+
+
+/*
+    Pixel dimensions.
+*/
+
+const ROAD_WIDTH =
+    ROAD_RTILES_X *
+    RTILE_WIDTH;
+
+const ROAD_HEIGHT =
+    ROAD_RTILES_Y *
+    RTILE_HEIGHT;
+
+
+/*
+    Expected:
+
+        20 × 108 rTiles
+        1280 × 3456 pixels
+*/
+
+if(
+    ROAD_RTILES_X !== 20 ||
+    ROAD_RTILES_Y !== 108 ||
+    ROAD_WIDTH !== 1280 ||
+    ROAD_HEIGHT !== 3456
+){
+    throw new Error(
+        "Invalid road footprint."
+    );
+}
+
+
+/*=========================================================
+  STATE
+=========================================================*/
 
 let inverted = false;
 
-/* terrain input grid */
-let terrain = Array.from({length:GRID}, () =>
-  Array(GRID).fill(128)
-);
 
-/* =========================
-   TERRAIN SAMPLING
-========================= */
+/*
+    Terrain edge data.
 
-function t(x,y){
-  return (terrain[y]?.[x] ?? 128) / 255;
+    These values come FROM THE TERRAIN SYSTEM.
+
+    They do not represent a terrain field owned
+    by the road generator.
+
+    Each sample corresponds to one native
+    terrain/rTile-level position.
+*/
+
+let terrainEdges = {
+
+    left:
+        createArray(
+            ROAD_RTILES_Y,
+            128
+        ),
+
+    right:
+        createArray(
+            ROAD_RTILES_Y,
+            128
+        ),
+
+    top:
+        createArray(
+            ROAD_RTILES_X,
+            128
+        ),
+
+    bottom:
+        createArray(
+            ROAD_RTILES_X,
+            128
+        )
+
+};
+
+
+/*
+    Native road field.
+
+    One entry = one rTile.
+
+    Nothing below this resolution exists.
+*/
+
+let roadField =
+    createField(
+        ROAD_RTILES_X,
+        ROAD_RTILES_Y,
+        0
+    );
+
+
+/*
+    Transition field.
+
+    Stores the terrain-derived transition
+    value at native rTile resolution.
+*/
+
+let transitionField =
+    createField(
+        ROAD_RTILES_X,
+        ROAD_RTILES_Y,
+        0
+    );
+
+
+/*=========================================================
+  FIELD HELPERS
+=========================================================*/
+
+function createArray(
+    length,
+    value = 0
+){
+
+    return Array(
+        length
+    ).fill(value);
+
 }
 
-/* =========================
-   ROAD FIELD MODEL
-========================= */
 
-function generateRoad(){
+function createField(
+    width,
+    height,
+    value = 0
+){
 
-  if(!terrain.length) return; // IMPORTANT FIX
+    return Array.from(
+        {
+            length:height
+        },
+        () =>
+            Array(
+                width
+            ).fill(value)
+    );
 
-  ctx.clearRect(0,0,SIZE,SIZE);
+}
 
-  let cx = Math.floor(GRID / 2);
 
-  for(let y = 0; y < GRID; y++){
+/*=========================================================
+  VALUE SANITIZATION
+=========================================================*/
 
-    /* =========================
-       TERRAIN-AWARE STEERING
-    ========================= */
+function clampValue(value){
 
-    const left  = t(cx-1,y);
-    const mid   = t(cx,y);
-    const right = t(cx+1,y);
+    value =
+        Number(value);
 
-    // prefer LOW terrain density
-    if(left < mid && left < right) cx--;
-    else if(right < mid && right < left) cx++;
+    if(
+        !Number.isFinite(value)
+    ){
+        value = 128;
+    }
 
-    cx = Math.max(0, Math.min(GRID-1, cx));
+    return Math.max(
+        0,
+        Math.min(
+            255,
+            Math.round(value)
+        )
+    );
 
-    /* =========================
-       RENDER ROW
-    ========================= */
+}
 
-    for(let x = 0; x < GRID; x++){
 
-      const dist = Math.abs(x - cx);
+/*=========================================================
+  EDGE DATA NORMALIZATION
+=========================================================*/
 
-      /* cord falloff */
-      let intensity = Math.exp(-(dist*dist)/2);
+function normalizeEdge(
+    input,
+    expectedLength
+){
 
-      /* invert toggle */
-      if(inverted) intensity = 1 - intensity;
+    const output =
+        createArray(
+            expectedLength,
+            128
+        );
 
-      /* terrain coupling influence */
-      const terrainFactor = 1 - t(x,y) * 0.35;
 
-      intensity *= terrainFactor;
+    if(
+        !Array.isArray(input)
+    ){
+        return output;
+    }
 
-      const v = Math.floor(intensity * 255);
 
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
+    for(
+        let i = 0;
+        i < expectedLength;
+        i++
+    ){
 
-      ctx.fillRect(
-        x * MTILE,
-        y * MTILE,
-        MTILE,
-        MTILE
-      );
+        if(
+            i < input.length
+        ){
+
+            output[i] =
+                clampValue(
+                    input[i]
+                );
+
+        }
 
     }
 
-  }
+
+    return output;
 
 }
 
-/* =========================
-   TOGGLE
-========================= */
 
-document.getElementById("invert").onclick = () => {
+/*=========================================================
+  SET TERRAIN EDGE DATA
+=========================================================*/
 
-  inverted = !inverted;
+/*
+    The road does NOT request a terrain grid
+    covering its own footprint.
 
-  document.getElementById("invert").textContent =
-    inverted ? "Invert: ON" : "Invert: OFF";
+    Instead the terrain system supplies the
+    terrain immediately bordering the road.
 
-  generateRoad();
+    Expected payload:
+
+    {
+        edges:{
+            left:   [108 values],
+            right:  [108 values],
+            top:    [20 values],
+            bottom: [20 values]
+        }
+    }
+
+    One value = one native terrain/rTile-level
+    sample.
+
+    No resampling occurs.
+*/
+
+function setTerrainEdges(
+    edges
+){
+
+    if(
+        !edges ||
+        typeof edges !== "object"
+    ){
+
+        console.warn(
+            "Road Generator: invalid terrain edge data."
+        );
+
+        return false;
+
+    }
+
+
+    terrainEdges = {
+
+        left:
+            normalizeEdge(
+                edges.left,
+                ROAD_RTILES_Y
+            ),
+
+        right:
+            normalizeEdge(
+                edges.right,
+                ROAD_RTILES_Y
+            ),
+
+        top:
+            normalizeEdge(
+                edges.top,
+                ROAD_RTILES_X
+            ),
+
+        bottom:
+            normalizeEdge(
+                edges.bottom,
+                ROAD_RTILES_X
+            )
+
+    };
+
+
+    generateRoad();
+
+    return true;
+
+}
+
+
+/*=========================================================
+  EDGE ACCESS
+=========================================================*/
+
+function getLeftTerrain(y){
+
+    return terrainEdges.left[y];
+
+}
+
+
+function getRightTerrain(y){
+
+    return terrainEdges.right[y];
+
+}
+
+
+function getTopTerrain(x){
+
+    return terrainEdges.top[x];
+
+}
+
+
+function getBottomTerrain(x){
+
+    return terrainEdges.bottom[x];
+
+}
+
+
+/*=========================================================
+  ROAD EDGE PROFILE
+=========================================================*/
+
+/*
+    Calculate the terrain relationship at one
+    longitudinal road row.
+
+    This is native rTile data.
+
+    There is no per-pixel sampling.
+*/
+
+function getLongitudinalProfile(y){
+
+    const left =
+        getLeftTerrain(y);
+
+    const right =
+        getRightTerrain(y);
+
+
+    const average =
+        (
+            left +
+            right
+        ) / 2;
+
+
+    const difference =
+        Math.abs(
+            left -
+            right
+        );
+
+
+    return {
+
+        left,
+        right,
+        average,
+        difference
+
+    };
+
+}
+
+
+/*=========================================================
+  ROAD TRANSITION
+=========================================================*/
+
+/*
+    The road footprint itself is 4p wide.
+
+    Terrain transition occurs at the road's
+    native outer edge.
+
+    We use rTiles for the transition.
+
+    No smaller unit is introduced.
+*/
+
+
+/*
+    Number of native rTiles used by the
+    transition on each side.
+
+    One rTile is the minimum possible.
+*/
+
+const TRANSITION_RTILES = 1;
+
+
+/*
+    Calculate transition value between:
+
+        adjacent terrain
+                  ↓
+              road value
+*/
+
+function transitionValue(
+    terrainValue,
+    roadValue,
+    distance
+){
+
+    /*
+        distance is native rTile distance.
+
+        0 = boundary
+        1 = next native unit
+    */
+
+    const factor =
+        Math.max(
+            0,
+            Math.min(
+                1,
+                1 -
+                (
+                    distance /
+                    (
+                        TRANSITION_RTILES + 1
+                    )
+                )
+            )
+        );
+
+
+    return Math.round(
+
+        terrainValue +
+        (
+            roadValue -
+            terrainValue
+        ) *
+        factor
+
+    );
+
+}
+
+
+/*=========================================================
+  ROAD CARVING
+=========================================================*/
+
+/*
+    This function creates the native road field.
+
+    Important:
+
+    The road does not fabricate terrain beneath
+    itself.
+
+    It uses terrain edge values to determine
+    the boundary transition.
+
+    Interior road rTiles are road values.
+
+    Edge rTiles receive carved transition values.
+*/
+
+function carveRoad(){
+
+    /*
+        Base road value.
+
+        White represents maximum road density.
+    */
+
+    const roadValue =
+        inverted
+            ? 0
+            : 255;
+
+
+    /*
+        Clear previous fields.
+    */
+
+    roadField =
+        createField(
+            ROAD_RTILES_X,
+            ROAD_RTILES_Y,
+            0
+        );
+
+    transitionField =
+        createField(
+            ROAD_RTILES_X,
+            ROAD_RTILES_Y,
+            0
+        );
+
+
+    /*
+        ---------------------------------------------------
+        MAIN ROAD FIELD
+        ---------------------------------------------------
+
+        The complete 4p × 18p footprint is
+        represented by native rTiles.
+    */
+
+    for(
+        let y = 0;
+        y < ROAD_RTILES_Y;
+        y++
+    ){
+
+        const leftTerrain =
+            getLeftTerrain(y);
+
+        const rightTerrain =
+            getRightTerrain(y);
+
+
+        for(
+            let x = 0;
+            x < ROAD_RTILES_X;
+            x++
+        ){
+
+            /*
+                Interior road.
+            */
+
+            let value =
+                roadValue;
+
+
+            /*
+                ------------------------------------------------
+                LEFT EDGE
+                ------------------------------------------------
+
+                The first native rTile on the road's
+                left boundary transitions from the
+                adjacent left terrain.
+            */
+
+            if(
+                x === 0
+            ){
+
+                value =
+                    transitionValue(
+                        leftTerrain,
+                        roadValue,
+                        0
+                    );
+
+                transitionField[y][x] =
+                    value;
+
+            }
+
+
+            /*
+                ------------------------------------------------
+                RIGHT EDGE
+                ------------------------------------------------
+            */
+
+            else if(
+                x === ROAD_RTILES_X - 1
+            ){
+
+                value =
+                    transitionValue(
+                        rightTerrain,
+                        roadValue,
+                        0
+                    );
+
+                transitionField[y][x] =
+                    value;
+
+            }
+
+
+            /*
+                Interior remains road.
+            */
+
+            else{
+
+                transitionField[y][x] =
+                    roadValue;
+
+            }
+
+
+            roadField[y][x] =
+                value;
+
+        }
+
+    }
+
+
+    /*
+        ---------------------------------------------------
+        END TRANSITIONS
+        ---------------------------------------------------
+
+        The road has two short ends.
+
+        Use top/bottom terrain edge data there.
+    */
+
+    for(
+        let x = 0;
+        x < ROAD_RTILES_X;
+        x++
+    ){
+
+        const topTerrain =
+            getTopTerrain(x);
+
+        const bottomTerrain =
+            getBottomTerrain(x);
+
+
+        /*
+            Top boundary.
+        */
+
+        roadField[0][x] =
+            transitionValue(
+                topTerrain,
+                roadValue,
+                0
+            );
+
+        transitionField[0][x] =
+            roadField[0][x];
+
+
+        /*
+            Bottom boundary.
+        */
+
+        roadField[
+            ROAD_RTILES_Y - 1
+        ][x] =
+            transitionValue(
+                bottomTerrain,
+                roadValue,
+                0
+            );
+
+        transitionField[
+            ROAD_RTILES_Y - 1
+        ][x] =
+            roadField[
+                ROAD_RTILES_Y - 1
+            ][x];
+
+    }
+
+}
+
+
+/*=========================================================
+  GENERATE
+=========================================================*/
+
+function generateRoad(){
+
+    carveRoad();
+
+    render();
+
+}
+
+
+/*=========================================================
+  RENDER
+=========================================================*/
+
+/*
+    Each rendered rectangle corresponds
+    to exactly one rTile.
+
+        rTile = 64 × 32
+
+    The canvas therefore represents:
+
+        20 × 108 native rTiles
+
+        1280 × 3456 pixels
+*/
+
+function render(){
+
+    ctx.clearRect(
+        0,
+        0,
+        ROAD_WIDTH,
+        ROAD_HEIGHT
+    );
+
+
+    for(
+        let y = 0;
+        y < ROAD_RTILES_Y;
+        y++
+    ){
+
+        for(
+            let x = 0;
+            x < ROAD_RTILES_X;
+            x++
+        ){
+
+            const value =
+                roadField[y][x];
+
+
+            ctx.fillStyle =
+                `rgb(${value},${value},${value})`;
+
+
+            ctx.fillRect(
+
+                x * RTILE_WIDTH,
+                y * RTILE_HEIGHT,
+
+                RTILE_WIDTH,
+                RTILE_HEIGHT
+
+            );
+
+        }
+
+    }
+
+}
+
+
+/*=========================================================
+  INVERT
+=========================================================*/
+
+document
+.getElementById("invertBtn")
+.onclick = () => {
+
+    inverted =
+        !inverted;
+
+
+    document
+    .getElementById("invertBtn")
+    .textContent =
+        inverted
+            ? "Invert: ON"
+            : "Invert: OFF";
+
+
+    generateRoad();
 
 };
 
-   
-  document.getElementById("export").onclick = () => {
 
-  const link = document.createElement("a");
+/*=========================================================
+  GENERATE BUTTON
+=========================================================*/
 
-  link.download = "road_1920.png";
-  link.href = canvas.toDataURL("image/png");
+document
+.getElementById("generateBtn")
+.onclick =
+    generateRoad;
 
-  link.click();
 
-};
+/*=========================================================
+  EXPORT
+=========================================================*/
 
-/* =========================
-   HUB INPUT
-========================= */
+function exportRoad(){
 
-window.addEventListener("message", (e) => {
+    /*
+        Standalone road export.
 
-  const msg = e.data;
-  if (!msg) return;
+        Exact dimensions:
 
-  switch (msg.type) {
+            1280 × 3456
 
-    case "SET_TERRAIN":
+        This is the actual 4p × 18p
+        road footprint.
+    */
 
-      if (msg.payload?.grid) {
-        terrain = msg.payload.grid;
-        generateRoad(); // regenerate ONLY on valid data
-      }
+    const link =
+        document.createElement("a");
 
-      break;
 
-    case "GENERATE":
-      // regenerate using last known terrain snapshot
-      generateRoad();
-      break;
+    link.download =
+        "road_4p_x_18p_1280x3456.png";
 
-    case "EXPORT":
-      const link = document.createElement("a");
-      link.download = "road_1920.jpg";
-      link.href = canvas.toDataURL("image/jpeg", 1.0);
-      link.click();
-      break;
-  }
 
-});
+    link.href =
+        canvas.toDataURL(
+            "image/png"
+        );
 
-/* =========================
-   INIT
-========================= */
+
+    link.click();
+
+}
+
+
+document
+.getElementById("exportBtn")
+.onclick =
+    exportRoad;
+
+
+/*=========================================================
+  HUB MESSAGE HANDLING
+=========================================================*/
+
+window.addEventListener(
+    "message",
+    (e) => {
+
+        const msg =
+            e.data;
+
+
+        if(!msg){
+            return;
+        }
+
+
+        switch(msg.type){
+
+            /*=============================================
+              TERRAIN EDGE DATA
+            =============================================*/
+
+            case "SET_TERRAIN":
+
+                /*
+                    Preferred form:
+
+                    payload:{
+                        edges:{
+                            left:[],
+                            right:[],
+                            top:[],
+                            bottom:[]
+                        }
+                    }
+                */
+
+                if(
+                    msg.payload?.edges
+                ){
+
+                    setTerrainEdges(
+                        msg.payload.edges
+                    );
+
+                }
+
+                /*
+                    Also allow direct:
+
+                    payload:{
+                        left:[],
+                        right:[],
+                        top:[],
+                        bottom:[]
+                    }
+                */
+
+                else if(
+                    msg.payload?.left ||
+                    msg.payload?.right ||
+                    msg.payload?.top ||
+                    msg.payload?.bottom
+                ){
+
+                    setTerrainEdges(
+                        msg.payload
+                    );
+
+                }
+
+                break;
+
+
+            /*=============================================
+              GENERATE
+            =============================================*/
+
+            case "GENERATE":
+
+                generateRoad();
+
+                break;
+
+
+            /*=============================================
+              EXPORT
+            =============================================*/
+
+            case "EXPORT":
+
+                exportRoad();
+
+                break;
+
+        }
+
+    }
+);
+
+
+/*=========================================================
+  INITIALIZATION
+=========================================================*/
 
 generateRoad();
+
+
+console.log(
+    "Road Generator Ready"
+);
+
+console.log(
+    "rTile:",
+    `${RTILE_WIDTH} × ${RTILE_HEIGHT}`
+);
+
+console.log(
+    "p:",
+    `${P_WIDTH} × ${P_HEIGHT}`
+);
+
+console.log(
+    "p composition:",
+    `${P_RTILES_X} × ${P_RTILES_Y} rTiles`
+);
+
+console.log(
+    "Road:",
+    `${ROAD_P_WIDTH}p × ${ROAD_P_HEIGHT}p`
+);
+
+console.log(
+    "Native road field:",
+    `${ROAD_RTILES_X} × ${ROAD_RTILES_Y} rTiles`
+);
+
+console.log(
+    "Export:",
+    `${ROAD_WIDTH} × ${ROAD_HEIGHT}`
+);
 
 </script>
 
