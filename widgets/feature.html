@@ -163,7 +163,7 @@ Features
 id="featureCount"
 type="range"
 min="1"
-max="5"
+max="4"
 value="3">
 
 <span id="countValue">
@@ -207,16 +207,28 @@ canvas.getContext("2d");
 const WIDTH = 768;
 const HEIGHT = 576;
 
-/* safe border */
+/*=========================================================
+  FEATURE FOOTPRINT
+=========================================================*/
 
-const BORDER = 72;
+/*
+    One feature footprint.
 
-/* one feature footprint */
+    The workspace is exactly:
+
+        2 × F_WIDTH
+        2 × F_HEIGHT
+
+    therefore:
+
+        768 / 384 = 2
+        576 / 288 = 2
+*/
 
 const F_WIDTH = 384;
 const F_HEIGHT = 288;
 
-/* eTile */
+/* one eTile */
 
 const ETILE = 16;
 
@@ -225,18 +237,38 @@ const ETILE = 16;
 const COLS = F_WIDTH / ETILE;
 const ROWS = F_HEIGHT / ETILE;
 
-/* grayscale values */
+/*=========================================================
+  FEATURE CELL GRID
+=========================================================*/
+
+/*
+    Four possible feature cells:
+
+        0 | 1
+        --+--
+        2 | 3
+*/
+
+const FEATURE_COLS =
+    WIDTH / F_WIDTH;
+
+const FEATURE_ROWS =
+    HEIGHT / F_HEIGHT;
+
+/*=========================================================
+  GRAYSCALE VALUES
+=========================================================*/
 
 const VALUES = [
 
-26,
-52,
-77,
-102,
-128,
-166,
-210,
-255
+    26,
+    52,
+    77,
+    102,
+    128,
+    166,
+    210,
+    255
 
 ];
 
@@ -253,60 +285,55 @@ document.getElementById("featureCount");
 const countLabel =
 document.getElementById("countValue");
 
-slider.oninput = () =>
-countLabel.textContent = slider.value;
-
-/*=========================================================
-  DATA
-=========================================================*/
-
 let linked = false;
 
-let featureCount = 3;
-
-/*
-Every entry represents ONE (f)
-
-{
-    x,
-    y,
-    data[],
-    linked
-}
-*/
-
-let features = [];
+let featureCount =
+    Number(slider.value);
 
 linkedBox.onchange = () => {
 
     linked =
-    linkedBox.checked;
+        linkedBox.checked;
 
 };
 
 slider.oninput = () => {
 
     featureCount =
-    Number(slider.value);
+        Number(slider.value);
 
     countLabel.textContent =
-    featureCount;
+        featureCount;
 
 };
 
 /*=========================================================
-  PART 2 CONTINUES HERE...
+  DATA
 =========================================================*/
 
+/*
+    Every entry represents ONE (f)
+
+    {
+        x,
+        y,
+        cell,
+        data
+    }
+*/
+
+let features = [];
+
 /*=========================================================
-  BUILD ONE (f)
+  RANDOM VALUE
 =========================================================*/
 
 function randomValue(){
 
     return VALUES[
         Math.floor(
-            Math.random()*VALUES.length
+            Math.random() *
+            VALUES.length
         )
     ];
 
@@ -318,336 +345,456 @@ function randomValue(){
 
 function buildF(){
 
-    const COLS = Math.floor(F_WIDTH / ETILE);
-    const ROWS = Math.floor(F_HEIGHT / ETILE);
+    const total =
+        COLS * ROWS;
 
-    const total = COLS * ROWS;
+    /*=====================================================
+      OCCUPANCY TARGET
+    =====================================================*/
 
-    /* occupancy target (controls density) */
-    const targetDensity = 0.22 + Math.random() * 0.18;
+    const targetDensity =
+        0.22 +
+        Math.random() * 0.18;
 
-    const targetCount = Math.floor(total * targetDensity);
+    const targetCount =
+        Math.floor(
+            total *
+            targetDensity
+        );
 
-    /* grid occupancy map */
-    const grid = new Array(COLS * ROWS).fill(0);
+    /*=====================================================
+      GRID OCCUPANCY
+    =====================================================*/
 
-    /* seed start near center */
-    let startX = Math.floor(COLS / 2);
-    let startY = Math.floor(ROWS / 2);
+    const grid =
+        new Array(total).fill(0);
+
+    /*=====================================================
+      SEED NEAR CENTER
+    =====================================================*/
+
+    const startX =
+        Math.floor(COLS / 2);
+
+    const startY =
+        Math.floor(ROWS / 2);
 
     function idx(x,y){
+
         return y * COLS + x;
+
     }
 
     function inBounds(x,y){
-        return x>=0 && y>=0 && x<COLS && y<ROWS;
+
+        return (
+            x >= 0 &&
+            y >= 0 &&
+            x < COLS &&
+            y < ROWS
+        );
+
     }
 
     function neighbors(x,y){
+
         return [
-            [x+1,y],
-            [x-1,y],
-            [x,y+1],
-            [x,y-1]
-        ];
-    }
 
-    /* start seed */
-    let frontier = [[startX,startY]];
-    grid[idx(startX,startY)] = 1;
+            [x + 1,y],
+            [x - 1,y],
+            [x,y + 1],
+            [x,y - 1]
 
-    let count = 1;
-
-    /* growth-based cluster (NOT noise field) */
-    while(frontier.length && count < targetCount){
-
-        const i = Math.floor(Math.random() * frontier.length);
-        const [x,y] = frontier[i];
-
-        const n = neighbors(x,y);
-
-        for(const [nx,ny] of n){
-
-            if(!inBounds(nx,ny)) continue;
-
-            const id = idx(nx,ny);
-
-            if(grid[id] === 0 && Math.random() > 0.35){
-
-                grid[id] = 1;
-                frontier.push([nx,ny]);
-                count++;
-
-                if(count >= targetCount) break;
-            }
-        }
-
-        /* prune frontier randomly */
-        if(Math.random() > 0.7){
-            frontier.splice(i,1);
-        }
-    }
-
-    /* assign values AFTER structure exists */
-    const data = grid.map(v => {
-
-        if(v === 0) return 0;
-
-        return VALUES[
-            Math.floor(Math.random() * VALUES.length)
         ];
 
-    });
-
-    return {
-        cols: COLS,
-        rows: ROWS,
-        data
-    };
-}
-
-/*=========================================================
-  COLLISION
-=========================================================*/
-
-function overlaps(x,y){
-
-    for(const f of features){
-
-        if(
-
-            x < f.x + F_WIDTH + ETILE &&
-            x + F_WIDTH + ETILE > f.x &&
-
-            y < f.y + F_HEIGHT + ETILE &&
-            y + F_HEIGHT + ETILE > f.y
-
-        ){
-
-            return true;
-
-        }
-
     }
 
-    return false;
+    /*=====================================================
+      START SEED
+    =====================================================*/
 
-}
+    let frontier = [
 
-/*=========================================================
-  RANDOM POSITION
-=========================================================*/
-
-function randomPosition(){
-
-    return{
-
-        x:
-        BORDER +
-
-        Math.floor(
-
-            Math.random()*
-
-            (WIDTH-F_WIDTH-BORDER*2)
-
-        ),
-
-        y:
-        BORDER +
-
-        Math.floor(
-
-            Math.random()*
-
-            (HEIGHT-F_HEIGHT-BORDER*2)
-
-        )
-
-    };
-
-}
-
-/*=========================================================
-  LINKED POSITION
-=========================================================*/
-
-function linkedPosition(parent){
-
-    /*
-       offsets are deliberately
-       smaller than footprint
-       allowing clusters
-    */
-
-    const choices=[
-
-        [192,0],
-        [-192,0],
-
-        [0,144],
-        [0,-144],
-
-        [192,144],
-        [-192,-144],
-
-        [192,-144],
-        [-192,144]
+        [startX,startY]
 
     ];
 
-    const c=
+    grid[
+        idx(startX,startY)
+    ] = 1;
 
-        choices[
+    let count = 1;
+
+    /*=====================================================
+      GROW CLUSTER
+    =====================================================*/
+
+    while(
+        frontier.length &&
+        count < targetCount
+    ){
+
+        const i =
             Math.floor(
-                Math.random()*choices.length
-            )
-        ];
+                Math.random() *
+                frontier.length
+            );
 
-    let x=
-
-        parent.x+c[0];
-
-    let y=
-
-        parent.y+c[1];
-
-    x=Math.max(
-
-        BORDER,
-
-        Math.min(
-
-            WIDTH-F_WIDTH-BORDER,
-
-            x
-
-        )
-
-    );
-
-    y=Math.max(
-
-        BORDER,
-
-        Math.min(
-
-            HEIGHT-F_HEIGHT-BORDER,
-
+        const [
+            x,
             y
+        ] = frontier[i];
 
-        )
+        const n =
+            neighbors(x,y);
 
-    );
+        /*
+            Randomize growth direction.
+        */
 
-    return{
+        n.sort(
+            () => Math.random() - 0.5
+        );
 
-        x,
+        for(
+            const [nx,ny] of n
+        ){
 
-        y
+            if(
+                !inBounds(nx,ny)
+            ){
+
+                continue;
+
+            }
+
+            const id =
+                idx(nx,ny);
+
+            if(
+                grid[id] === 0 &&
+                Math.random() > 0.35
+            ){
+
+                grid[id] = 1;
+
+                frontier.push([
+                    nx,
+                    ny
+                ]);
+
+                count++;
+
+                if(
+                    count >= targetCount
+                ){
+
+                    break;
+
+                }
+
+            }
+
+        }
+
+        /*=================================================
+          RANDOM FRONTIER PRUNING
+        =================================================*/
+
+        if(
+            Math.random() > 0.7
+        ){
+
+            frontier.splice(
+                i,
+                1
+            );
+
+        }
+
+    }
+
+    /*=====================================================
+      ASSIGN VALUES AFTER STRUCTURE EXISTS
+    =====================================================*/
+
+    const data =
+        grid.map(v => {
+
+            if(v === 0){
+
+                return 0;
+
+            }
+
+            return randomValue();
+
+        });
+
+    return {
+
+        cols: COLS,
+        rows: ROWS,
+        data
 
     };
 
 }
 
 /*=========================================================
-  PLACE FEATURE
+  FEATURE CELL POSITION
 =========================================================*/
 
-function placeFeature(){
+function cellPosition(cell){
 
-    /*
-      FIRST FEATURE
-    */
+    const cellX =
+        cell % FEATURE_COLS;
 
-    if(features.length===0){
+    const cellY =
+        Math.floor(
+            cell / FEATURE_COLS
+        );
 
-        const p=randomPosition();
+    return {
 
-        features.push({
+        x:
+            cellX * F_WIDTH,
 
-            x:p.x,
+        y:
+            cellY * F_HEIGHT
 
-            y:p.y,
+    };
 
-            data:buildF()
+}
 
-        });
+/*=========================================================
+  CELL NEIGHBORS
+=========================================================*/
 
-        return;
+function cellNeighbors(cell){
+
+    const cellX =
+        cell % FEATURE_COLS;
+
+    const cellY =
+        Math.floor(
+            cell / FEATURE_COLS
+        );
+
+    const result = [];
+
+    /* left */
+
+    if(cellX > 0){
+
+        result.push(
+            cell - 1
+        );
 
     }
 
+    /* right */
+
+    if(
+        cellX <
+        FEATURE_COLS - 1
+    ){
+
+        result.push(
+            cell + 1
+        );
+
+    }
+
+    /* up */
+
+    if(cellY > 0){
+
+        result.push(
+            cell - FEATURE_COLS
+        );
+
+    }
+
+    /* down */
+
+    if(
+        cellY <
+        FEATURE_ROWS - 1
+    ){
+
+        result.push(
+            cell + FEATURE_COLS
+        );
+
+    }
+
+    return result;
+
+}
+
+/*=========================================================
+  SHUFFLE
+=========================================================*/
+
+function shuffle(array){
+
+    for(
+        let i = array.length - 1;
+        i > 0;
+        i--
+    ){
+
+        const j =
+            Math.floor(
+                Math.random() *
+                (i + 1)
+            );
+
+        [
+            array[i],
+            array[j]
+        ] = [
+            array[j],
+            array[i]
+        ];
+
+    }
+
+    return array;
+
+}
+
+/*=========================================================
+  CHOOSE FEATURE CELLS
+=========================================================*/
+
+function chooseCells(){
+
     /*
-      LINKED MODE
+        Four exact (f) cells exist:
+
+            0 | 1
+            --+--
+            2 | 3
     */
+
+    const cells = [];
+
+    /*=====================================================
+      FIRST FEATURE
+    =====================================================*/
+
+    const firstCell =
+        Math.floor(
+            Math.random() * 4
+        );
+
+    cells.push(firstCell);
+
+    /*=====================================================
+      LINKED MODE
+    =====================================================*/
 
     if(linked){
 
-        let attempts=50;
+        while(
+            cells.length <
+            featureCount
+        ){
 
-        while(attempts--){
+            const candidates = [];
 
-            const parent=
+            /*
+                Find all unoccupied cells
+                adjacent to the current cluster.
+            */
 
-                features[
-                    Math.floor(
-                        Math.random()*
-                        features.length
-                    )
-                ];
+            for(
+                const cell of cells
+            ){
 
-            const p=
+                const neighbors =
+                    cellNeighbors(cell);
 
-                linkedPosition(parent);
+                for(
+                    const neighbor
+                    of neighbors
+                ){
 
-            if(!overlaps(p.x,p.y)){
+                    if(
+                        !cells.includes(
+                            neighbor
+                        ) &&
+                        !candidates.includes(
+                            neighbor
+                        )
+                    ){
 
-                features.push({
+                        candidates.push(
+                            neighbor
+                        );
 
-                    x:p.x,
+                    }
 
-                    y:p.y,
-
-                    data:buildF()
-
-                });
-
-                return;
+                }
 
             }
 
+            if(
+                candidates.length === 0
+            ){
+
+                break;
+
+            }
+
+            const selected =
+                candidates[
+                    Math.floor(
+                        Math.random() *
+                        candidates.length
+                    )
+                ];
+
+            cells.push(selected);
+
         }
+
+        return cells;
 
     }
 
-    /*
+    /*=====================================================
       UNLINKED MODE
-    */
+    =====================================================*/
 
-    let attempts=100;
+    const remaining = [
 
-    while(attempts--){
+        0,
+        1,
+        2,
+        3
 
-        const p=randomPosition();
+    ].filter(
+        cell =>
+            !cells.includes(cell)
+    );
 
-        if(!overlaps(p.x,p.y)){
+    shuffle(remaining);
 
-            features.push({
+    while(
+        cells.length <
+        featureCount
+    ){
 
-                x:p.x,
-
-                y:p.y,
-
-                data:buildF()
-
-            });
-
-            return;
-
-        }
+        cells.push(
+            remaining.shift()
+        );
 
     }
+
+    return cells;
 
 }
 
@@ -657,19 +804,33 @@ function placeFeature(){
 
 function generate(){
 
-    features=[];
+    features = [];
+
+    const cells =
+        chooseCells();
 
     for(
-
-        let i=0;
-
-        i<featureCount;
-
-        i++
-
+        const cell of cells
     ){
 
-        placeFeature();
+        const position =
+            cellPosition(cell);
+
+        features.push({
+
+            x:
+                position.x,
+
+            y:
+                position.y,
+
+            cell:
+                cell,
+
+            data:
+                buildF()
+
+        });
 
     }
 
@@ -681,43 +842,77 @@ function generate(){
 
 function render(){
 
-    ctx.fillStyle="#000";
-    ctx.fillRect(0,0,WIDTH,HEIGHT);
+    /*=====================================================
+      CLEAR WORKSPACE
+    =====================================================*/
 
-    for(const feature of features){
+    ctx.fillStyle =
+        "#000";
 
-        const f=feature.data;
+    ctx.fillRect(
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+    );
 
-        for(let i=0;i<f.data.length;i++){
+    /*=====================================================
+      RENDER EACH FEATURE
+    =====================================================*/
 
-            const value=f.data[i];
+    for(
+        const feature
+        of features
+    ){
 
-            if(value===0) continue;
+        const f =
+            feature.data;
 
-            const ex=i%f.cols;
-            const ey=Math.floor(i/f.cols);
+        for(
+            let i = 0;
+            i < f.data.length;
+            i++
+        ){
 
-            const px=feature.x+ex*ETILE;
-            const py=feature.y+ey*ETILE;
+            const value =
+                f.data[i];
 
-            /* keep inside protected border */
+            /*
+                Zero = empty.
+            */
 
-            if(
-                px < BORDER ||
-                py < BORDER ||
-                px + ETILE > WIDTH - BORDER ||
-                py + ETILE > HEIGHT - BORDER
-            ){
+            if(value === 0){
+
                 continue;
+
             }
 
-            ctx.fillStyle=`rgb(${value},${value},${value})`;
+            const ex =
+                i % f.cols;
+
+            const ey =
+                Math.floor(
+                    i / f.cols
+                );
+
+            const px =
+                feature.x +
+                ex * ETILE;
+
+            const py =
+                feature.y +
+                ey * ETILE;
+
+            ctx.fillStyle =
+                `rgb(${value},${value},${value})`;
 
             ctx.fillRect(
+
                 px,
                 py,
                 ETILE,
                 ETILE
+
             );
 
         }
@@ -732,24 +927,41 @@ function render(){
 
 function exportFeature(){
 
-    const link=document.createElement("a");
+    /*
+        Standalone export.
 
-    link.download="feature_768x576.png";
+        Exact canvas dimensions:
 
-    link.href=
-        canvas.toDataURL("image/png");
+            768 × 576
+
+        PNG preserves the generated
+        grayscale values without
+        JPEG compression.
+    */
+
+    const link =
+        document.createElement("a");
+
+    link.download =
+        "feature_768x576.png";
+
+    link.href =
+        canvas.toDataURL(
+            "image/png"
+        );
 
     link.click();
 
 }
 
 /*=========================================================
-  GENERATE + RENDER
+  REGENERATE
 =========================================================*/
 
 function regenerate(){
 
     generate();
+
     render();
 
 }
@@ -760,66 +972,88 @@ function regenerate(){
 
 document
 .getElementById("generateBtn")
-.onclick=regenerate;
+.onclick =
+    regenerate;
 
 document
 .getElementById("exportBtn")
-.onclick=exportFeature;
+.onclick =
+    exportFeature;
 
 /*=========================================================
   HUB MESSAGES
 =========================================================*/
 
-window.addEventListener("message",(e)=>{
+window.addEventListener(
+    "message",
+    (e) => {
 
-    const msg=e.data;
+        const msg =
+            e.data;
 
-    if(!msg) return;
+        if(!msg){
 
-    switch(msg.type){
+            return;
 
-        case "INIT":
+        }
 
-            regenerate();
-            break;
+        switch(msg.type){
 
-        case "GENERATE":
+            case "INIT":
 
-            regenerate();
-            break;
+                regenerate();
 
-        case "EXPORT":
+                break;
 
-            exportFeature();
-            break;
+            case "GENERATE":
 
-        case "FEATURE_ZOOM":
+                regenerate();
 
-            if(msg.payload?.zoom){
+                break;
 
-                canvas.style.transform=
-                    `scale(${msg.payload.zoom})`;
+            case "EXPORT":
 
-            }
+                exportFeature();
 
-            break;
+                break;
+
+            case "FEATURE_ZOOM":
+
+                if(
+                    msg.payload?.zoom
+                ){
+
+                    canvas.style.transform =
+                        `scale(${msg.payload.zoom})`;
+
+                }
+
+                break;
+
+        }
 
     }
-
-});
+);
 
 /*=========================================================
   INITIALIZE
 =========================================================*/
 
-featureCount=
-Number(slider.value);
+featureCount =
+    Number(
+        slider.value
+    );
 
-linked=
-linkedBox.checked;
+linked =
+    linkedBox.checked;
 
 regenerate();
 
 console.log(
     "Feature Generator Ready"
 );
+
+</script>
+
+</body>
+</html>
