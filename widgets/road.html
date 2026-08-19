@@ -76,6 +76,7 @@ canvas {
   <div id="toolbar">
     <button id="regen">Generate Road</button>
     <button id="invert">Invert: OFF</button>
+    <button id="export">Export Road</button>
   </div>
 
   <div id="wrap">
@@ -197,6 +198,18 @@ document.getElementById("invert").onclick = () => {
     inverted ? "Invert: ON" : "Invert: OFF";
 
   generateRoad();
+
+};
+
+   
+  document.getElementById("export").onclick = () => {
+
+  const link = document.createElement("a");
+
+  link.download = "road_1920.png";
+  link.href = canvas.toDataURL("image/png");
+
+  link.click();
 
 };
 
